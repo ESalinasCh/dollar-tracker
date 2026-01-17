@@ -40,12 +40,13 @@ Esta carpeta contiene los mockups de diseño para cada pantalla de la aplicació
 ---
 
 ### 4. Configuración y Alertas
-*(Pendiente de generar)*
+![Alerts](./04-alerts.png)
 
-**Elementos planificados:**
-- Lista de alertas activas con toggle
-- Formulario para nueva alerta
-- Configuración de notificaciones
+**Elementos:**
+- Sidebar de navegación (Dashboard, Charts, Reports, Alerts, Settings)
+- Lista de alertas activas con toggle on/off
+- Formulario para nueva alerta (condición, umbral, exchanges)
+- Preferencias de notificación (Email, Push, In-App)
 
 ---
 
