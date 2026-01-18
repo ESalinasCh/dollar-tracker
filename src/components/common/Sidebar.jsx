@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useNotifications } from '../../context/NotificationContext';
 
 // Simple icon components (can be replaced with lucide-react later)
 const icons = {
@@ -45,14 +46,15 @@ const icons = {
     ),
 };
 
-const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-    { id: 'charts', label: 'Charts', icon: 'charts' },
-    { id: 'reports', label: 'Reports', icon: 'reports' },
-    { id: 'alerts', label: 'Alerts', icon: 'alerts', badge: 2 },
-];
-
 function Sidebar({ currentPage, onNavigate, isOpen, onClose }) {
+    const { unreadCount } = useNotifications();
+
+    const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+        { id: 'charts', label: 'Charts', icon: 'charts' },
+        { id: 'reports', label: 'Reports', icon: 'reports' },
+        { id: 'alerts', label: 'Alerts', icon: 'alerts', badge: unreadCount > 0 ? unreadCount : null },
+    ];
     return (
         <>
             {/* Mobile overlay */}

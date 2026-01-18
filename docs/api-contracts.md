@@ -330,3 +330,188 @@ Todos los endpoints siguen el mismo formato de error:
 - `404` - Not Found
 - `429` - Rate Limited
 - `500` - Internal Server Error
+
+---
+
+## 📬 Endpoints de Notificaciones
+
+### GET /notifications
+
+Lista todas las notificaciones del usuario.
+
+**Query Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| unread | boolean | No | Filtrar solo no leídas |
+| limit | number | No | Límite de resultados (default: 50) |
+
+**Response:**
+```json
+{
+  "notifications": [
+    {
+      "id": "notif-001",
+      "type": "alert",
+      "title": "Price Alert Triggered",
+      "message": "USD/BOB crossed above $7.00",
+      "timestamp": "2026-01-17T08:30:00Z",
+      "read": false,
+      "metadata": {
+        "alertId": "alert-001",
+        "price": 7.02,
+        "exchange": "binance"
+      }
+    }
+  ],
+  "unreadCount": 3,
+  "total": 15
+}
+```
+
+---
+
+### PUT /notifications/:id/read
+
+Marca una notificación como leída.
+
+**Response:**
+```json
+{
+  "success": true,
+  "notification": {
+    "id": "notif-001",
+    "read": true
+  }
+}
+```
+
+---
+
+### PUT /notifications/read-all
+
+Marca todas las notificaciones como leídas.
+
+**Response:**
+```json
+{
+  "success": true,
+  "updatedCount": 5
+}
+```
+
+---
+
+### DELETE /notifications/:id
+
+Elimina una notificación.
+
+**Response:**
+```json
+{
+  "success": true,
+  "deletedId": "notif-001"
+}
+```
+
+---
+
+### DELETE /notifications/clear
+
+Elimina todas las notificaciones.
+
+**Response:**
+```json
+{
+  "success": true,
+  "deletedCount": 15
+}
+```
+
+---
+
+## 📋 Endpoints Adicionales de Reportes
+
+### GET /reports
+
+Lista todos los reportes del usuario.
+
+**Query Parameters:**
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| type | string | No | Filtrar por tipo (daily, weekly, monthly) |
+| status | string | No | Filtrar por estado (processing, completed, failed) |
+| limit | number | No | Límite de resultados (default: 20) |
+
+**Response:**
+```json
+{
+  "reports": [
+    {
+      "id": "report-001",
+      "name": "Weekly Report - Jan 10-17",
+      "type": "weekly",
+      "format": "pdf",
+      "dateRange": {
+        "from": "2026-01-10",
+        "to": "2026-01-17"
+      },
+      "status": "completed",
+      "size": 1200000,
+      "downloadUrl": "/reports/download/report-001.pdf",
+      "createdAt": "2026-01-17T08:00:00Z",
+      "expiresAt": "2026-01-24T08:00:00Z"
+    }
+  ],
+  "total": 8
+}
+```
+
+---
+
+### DELETE /reports/:id
+
+Elimina un reporte.
+
+**Response:**
+```json
+{
+  "success": true,
+  "deletedId": "report-001"
+}
+```
+
+---
+
+## 🔄 WebSocket Events
+
+### Eventos de Notificación
+
+```
+ws://api.dollartracker.com/ws/notifications
+```
+
+**Event: notification_new**
+```json
+{
+  "type": "notification_new",
+  "data": {
+    "id": "notif-001",
+    "type": "alert",
+    "title": "Price Alert Triggered",
+    "message": "USD/BOB crossed above $7.00",
+    "timestamp": "2026-01-17T08:30:00Z"
+  }
+}
+```
+
+**Event: report_ready**
+```json
+{
+  "type": "report_ready",
+  "data": {
+    "reportId": "report-123",
+    "name": "Weekly Report",
+    "downloadUrl": "/reports/download/report-123.pdf"
+  }
+}
+```

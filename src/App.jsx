@@ -6,8 +6,13 @@ import { useState } from 'react';
 import Sidebar from './components/common/Sidebar';
 import Header from './components/common/Header';
 import Dashboard from './pages/Dashboard';
+import Charts from './pages/Charts';
+import Alerts from './pages/Alerts';
+import Reports from './pages/Reports';
+import { NotificationProvider } from './context/NotificationContext';
+import ToastContainer from './components/common/Toast';
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -16,11 +21,11 @@ function App() {
       case 'dashboard':
         return <Dashboard />;
       case 'charts':
-        return <div className="main"><h1>Charts - Coming Soon</h1></div>;
+        return <Charts />;
       case 'reports':
-        return <div className="main"><h1>Reports - Coming Soon</h1></div>;
+        return <Reports />;
       case 'alerts':
-        return <div className="main"><h1>Alerts - Coming Soon</h1></div>;
+        return <Alerts />;
       default:
         return <Dashboard />;
     }
@@ -41,7 +46,16 @@ function App() {
         />
         {renderPage()}
       </div>
+      <ToastContainer />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
   );
 }
 

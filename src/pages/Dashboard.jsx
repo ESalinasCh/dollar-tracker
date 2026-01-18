@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
-import { CURRENT_PRICES, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
+import PriceLineChart from '../components/charts/PriceLineChart';
+import { CURRENT_PRICES, PRICE_HISTORY, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -104,31 +106,19 @@ function AlertItem({ alert }) {
     );
 }
 
-// Simple Chart Placeholder
-function ChartPlaceholder() {
-    return (
-        <div className="chart-body" style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--color-bg-input)',
-            borderRadius: 'var(--radius-md)'
-        }}>
-            <div className="text-center">
-                <div className="text-4xl mb-md">📈</div>
-                <div className="text-secondary">
-                    Chart coming soon...
-                </div>
-                <div className="text-xs text-muted mt-sm">
-                    Integration with Recharts in next sprint
-                </div>
-            </div>
-        </div>
-    );
-}
+// Time period options
+const TIME_PERIODS = [
+    { key: '1h', label: '1H' },
+    { key: '24h', label: '24H' },
+    { key: '7d', label: '7D' },
+    { key: '30d', label: '1M' },
+    { key: '1y', label: '1Y' }
+];
 
 function Dashboard() {
+    const [selectedPeriod, setSelectedPeriod] = useState('24h');
     const { prices, average } = CURRENT_PRICES;
+    const priceHistoryData = PRICE_HISTORY[selectedPeriod] || PRICE_HISTORY['24h'];
 
     // Calculate total volume
     const totalVolume = prices.reduce((sum, p) => sum + p.volume24h, 0);
@@ -184,14 +174,20 @@ function Dashboard() {
                 <div>
                     <Card title="Price History" action={
                         <div className="nav-tabs">
-                            <button className="nav-tab">1H</button>
-                            <button className="nav-tab active">24H</button>
-                            <button className="nav-tab">7D</button>
-                            <button className="nav-tab">1M</button>
-                            <button className="nav-tab">1Y</button>
+                            {TIME_PERIODS.map(period => (
+                                <button
+                                    key={period.key}
+                                    className={`nav-tab ${selectedPeriod === period.key ? 'active' : ''}`}
+                                    onClick={() => setSelectedPeriod(period.key)}
+                                >
+                                    {period.label}
+                                </button>
+                            ))}
                         </div>
                     }>
-                        <ChartPlaceholder />
+                        <div style={{ minHeight: '300px' }}>
+                            <PriceLineChart data={priceHistoryData} height={300} />
+                        </div>
                     </Card>
                 </div>
 
