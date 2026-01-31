@@ -54,7 +54,9 @@ function ExchangeItem({ exchange }) {
         huobi: '#1c2e5a',
         exchangerate_api: '#2c3e50',
         dolarapi: '#27ae60',
-        bluelytics: '#2980b9'
+        bluelytics: '#2980b9',
+        dolarapi_binance: '#f3ba2f',
+        dolarapi_oficial: '#2c3e50'
     };
 
     return (

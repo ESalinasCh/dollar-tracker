@@ -34,7 +34,6 @@ class ExchangeService:
             "exchangerate_api": "unknown",
             "binance": "unknown",
             "dolarapi": "unknown",
-            "bluelytics": "unknown",
         }
         self._coinbase_bob_rate: float = 6.96  # Official rate cache
         self._exchangerate_bob: float = 6.92  # ExchangeRate-API rate
@@ -114,7 +113,7 @@ class ExchangeService:
             logger.error(f"Binance error: {e}")
             self._source_status["binance"] = "error"
         
-        # Try DolarAPI (Argentina blue rate as reference)
+        # Try DolarAPI (Bolivia Endpoint)
         try:
             dolar_data = await self._fetch_dolarapi()
             if dolar_data:
@@ -128,18 +127,6 @@ class ExchangeService:
         # Set source used
         if sources_active:
             source_used = " + ".join(sources_active)
-        
-        # Try Bluelytics as backup
-        if not prices:
-            try:
-                bluelytics_data = await self._fetch_bluelytics()
-                if bluelytics_data:
-                    prices.extend(bluelytics_data)
-                    source_used = "Bluelytics"
-                    self._source_status["bluelytics"] = "active"
-            except Exception as e:
-                logger.error(f"Bluelytics error: {e}")
-                self._source_status["bluelytics"] = "error"
         
         # If no data, use mock data
         if not prices:
@@ -278,13 +265,6 @@ class ExchangeService:
                 status=self._source_status.get("dolarapi", "unknown"),
                 last_check=datetime.utcnow(),
             ),
-            SourceInfo(
-                id="bluelytics",
-                name="Bluelytics",
-                url="https://bluelytics.com.ar",
-                status=self._source_status.get("bluelytics", "unknown"),
-                last_check=datetime.utcnow(),
-            ),
         ]
         
         return SourcesResponse(sources=sources)
@@ -367,7 +347,7 @@ class ExchangeService:
         return 1500.0
     
     async def _fetch_dolarapi(self) -> list[ExchangePrice]:
-        """Fetch data from DolarAPI.com."""
+        """Fetch data from DolarAPI.com (Bolivia Endpoint)."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(f"{settings.dolar_api_url}/dolares")
             response.raise_for_status()
@@ -375,74 +355,34 @@ class ExchangeService:
             
             prices = []
             for item in data:
-                if item.get("compra") and item.get("venta"):
-                    # Convert from ARS to BOB using Coinbase official rate
-                    # DolarAPI gives ARS rates, we convert to BOB
-                    factor = self._coinbase_bob_rate / 1000 if item.get("compra", 0) > 100 else 1
+                # Map 'casa' to exchange
+                exchange_id = f"dolarapi_{item.get('casa', 'unknown').lower()}"
+                
+                # Check for valid prices (Binance might have None for compra)
+                bid = item.get("compra") or 0.0
+                ask = item.get("venta") or 0.0
+                
+                if bid == 0 and ask == 0:
+                    continue
                     
-                    prices.append(ExchangePrice(
-                        exchange=item.get("casa", "unknown").lower().replace(" ", "_"),
-                        name=item.get("nombre", item.get("casa", "Unknown")),
-                        bid=round(item.get("compra", 0) * factor, 2),
-                        ask=round(item.get("venta", 0) * factor, 2),
-                        last=round((item.get("compra", 0) + item.get("venta", 0)) / 2 * factor, 2),
-                        change_24h=0.0,
-                        updated_at=datetime.fromisoformat(
-                            item.get("fechaActualizacion", datetime.utcnow().isoformat()).replace("Z", "+00:00")
-                        ) if item.get("fechaActualizacion") else datetime.utcnow(),
-                    ))
-            
-            # Add Coinbase official rate as a reference
-            prices.append(ExchangePrice(
-                exchange="coinbase",
-                name="Coinbase (Oficial BOB)",
-                bid=round(self._coinbase_bob_rate * 0.99, 2),
-                ask=round(self._coinbase_bob_rate * 1.01, 2),
-                last=round(self._coinbase_bob_rate, 2),
-                change_24h=0.0,
-                updated_at=datetime.utcnow(),
-            ))
-            
-            return prices
-    
-    async def _fetch_bluelytics(self) -> list[ExchangePrice]:
-        """Fetch data from Bluelytics API."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{settings.bluelytics_api_url}/latest")
-            response.raise_for_status()
-            data = response.json()
-            
-            prices = []
-            
-            # Blue rate
-            if data.get("blue"):
-                blue = data["blue"]
-                # Convert from ARS to approximate BOB
-                factor = 6.96 / blue.get("value_avg", 1000)
-                
+                # Calculate last price
+                if bid > 0 and ask > 0:
+                    last = (bid + ask) / 2
+                elif ask > 0: # If only ask (sell) price exists (like Binance here)
+                    last = ask
+                else:
+                    last = bid
+                    
                 prices.append(ExchangePrice(
-                    exchange="blue",
-                    name="Dólar Blue",
-                    bid=round(blue.get("value_buy", 0) * factor, 2),
-                    ask=round(blue.get("value_sell", 0) * factor, 2),
-                    last=round(blue.get("value_avg", 0) * factor, 2),
+                    exchange=exchange_id, # 'oficial' or 'binance'
+                    name=item.get("nombre", item.get("casa", "Unknown")),
+                    bid=float(bid),
+                    ask=float(ask),
+                    last=round(float(last), 2),
                     change_24h=0.0,
-                    updated_at=datetime.utcnow(),
-                ))
-            
-            # Official rate
-            if data.get("oficial"):
-                oficial = data["oficial"]
-                factor = 6.96 / oficial.get("value_avg", 1000)
-                
-                prices.append(ExchangePrice(
-                    exchange="oficial",
-                    name="Dólar Oficial",
-                    bid=round(oficial.get("value_buy", 0) * factor, 2),
-                    ask=round(oficial.get("value_sell", 0) * factor, 2),
-                    last=round(oficial.get("value_avg", 0) * factor, 2),
-                    change_24h=0.0,
-                    updated_at=datetime.utcnow(),
+                    updated_at=datetime.fromisoformat(
+                        item.get("fechaActualizacion", datetime.utcnow().isoformat()).replace("Z", "+00:00")
+                    ) if item.get("fechaActualizacion") else datetime.utcnow(),
                 ))
             
             return prices

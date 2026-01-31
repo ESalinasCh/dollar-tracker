@@ -15,8 +15,8 @@ class Settings(BaseSettings):
     cache_ttl: int = 60  # seconds
     
     # External APIs
-    dolar_api_url: str = "https://dolarapi.com/v1"
-    bluelytics_api_url: str = "https://api.bluelytics.com.ar/v2"
+    # External APIs
+    dolar_api_url: str = "https://bo.dolarapi.com/v1"
     exchange_rate_api_url: str = "https://api.exchangerate-api.com/v4"
     
     # CORS
