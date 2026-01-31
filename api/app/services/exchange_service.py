@@ -32,7 +32,13 @@ class ExchangeService:
         self._source_status: dict = {
             "binance": "unknown",
             "okx": "unknown",
+            "airtm": "unknown",
+            "wallbit": "unknown",
+            "takenos": "unknown",
+            "bcb": "unknown",
         }
+        # DolarBlueBolivia API base URL
+        self._dbb_base_url = "https://api.dolarbluebolivia.click"
     
     async def get_current_prices(self) -> CurrentPricesResponse:
         """Get current exchange rates from available sources."""
@@ -93,6 +99,16 @@ class ExchangeService:
             self._source_status["okx"] = "error"
         
         # Set source used
+        if sources_active:
+            source_used = " + ".join(sources_active)
+        
+        # Fetch DolarBlueBolivia sources (AirTM, Wallbit, Takenos, BCB)
+        dbb_sources = await self._fetch_dolarblue_sources()
+        for price in dbb_sources:
+            prices.append(price)
+            sources_active.append(price.name)
+        
+        # Update source string
         if sources_active:
             source_used = " + ".join(sources_active)
         
@@ -225,9 +241,132 @@ class ExchangeService:
                 status=self._source_status.get("okx", "unknown"),
                 last_check=datetime.utcnow(),
             ),
+            SourceInfo(
+                id="airtm",
+                name="AirTM",
+                url="https://airtm.com",
+                status=self._source_status.get("airtm", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="wallbit",
+                name="Wallbit",
+                url="https://wallbit.io",
+                status=self._source_status.get("wallbit", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="takenos",
+                name="Takenos",
+                url="https://takenos.com",
+                status=self._source_status.get("takenos", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="bcb",
+                name="Banco Central de Bolivia",
+                url="https://www.bcb.gob.bo",
+                status=self._source_status.get("bcb", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
         ]
         
         return SourcesResponse(sources=sources)
+    
+    async def _fetch_dolarblue_sources(self) -> list[ExchangePrice]:
+        """
+        Fetch rates from DolarBlueBolivia API sources.
+        Returns list of ExchangePrice from AirTM, Wallbit, Takenos, and BCB.
+        """
+        prices = []
+        now = datetime.utcnow()
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # AirTM
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/airtm")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("addValue") and data.get("withdrawValue"):
+                        self._source_status["airtm"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="airtm",
+                            name="AirTM",
+                            ask=round(float(data["addValue"]), 2),  # Buy USD
+                            bid=round(float(data["withdrawValue"]), 2),  # Sell USD
+                            last=round((float(data["addValue"]) + float(data["withdrawValue"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"AirTM error: {e}")
+                self._source_status["airtm"] = "error"
+            
+            # Wallbit
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/wallbit")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("buy") and data.get("sell"):
+                        self._source_status["wallbit"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="wallbit",
+                            name="Wallbit",
+                            ask=round(float(data["buy"]), 2),
+                            bid=round(float(data["sell"]), 2),
+                            last=round((float(data["buy"]) + float(data["sell"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"Wallbit error: {e}")
+                self._source_status["wallbit"] = "error"
+            
+            # Takenos
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/takenos")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("buy") and data.get("sell"):
+                        self._source_status["takenos"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="takenos",
+                            name="Takenos",
+                            ask=round(float(data["buy"]), 2),
+                            bid=round(float(data["sell"]), 2),
+                            last=round((float(data["buy"]) + float(data["sell"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"Takenos error: {e}")
+                self._source_status["takenos"] = "error"
+            
+            # BCB (Banco Central de Bolivia) - Official Rate
+            try:
+                response = await client.get(f"{self._dbb_base_url}/v1/bcb")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("compra") and data.get("venta"):
+                        self._source_status["bcb"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="bcb",
+                            name="BCB (Oficial)",
+                            ask=round(float(data["venta"]), 2),  # Venta = Buy USD
+                            bid=round(float(data["compra"]), 2),  # Compra = Sell USD
+                            last=round((float(data["venta"]) + float(data["compra"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"BCB error: {e}")
+                self._source_status["bcb"] = "error"
+        
+        return prices
     
     # ============================================
     # Private Methods
