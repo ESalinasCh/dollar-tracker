@@ -35,7 +35,5 @@ uvicorn app.main:app --host 0.0.0.0 --port 3001
 | `/api/v1/stats/volatility` | GET | Volatility metrics |
 
 ## Data Sources
-
-- **DolarAPI.com** - Primary source (Argentina)
-- **Bluelytics** - Backup source
-- **ExchangeRate-API** - Official rates
+- **Binance P2P** - Real-time market rates (USDT/BOB)
+- **Others** - [REMOVED] (DolarAPI, Coinbase, etc.)
