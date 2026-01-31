@@ -7,30 +7,6 @@ export const EXCHANGES = [
     name: 'Binance',
     logo: '/logos/binance.svg',
     color: '#f3ba2f'
-  },
-  {
-    id: 'kraken',
-    name: 'Kraken',
-    logo: '/logos/kraken.svg',
-    color: '#5741d9'
-  },
-  {
-    id: 'coinbase',
-    name: 'Coinbase',
-    logo: '/logos/coinbase.svg',
-    color: '#0052ff'
-  },
-  {
-    id: 'bitso',
-    name: 'Bitso',
-    logo: '/logos/bitso.svg',
-    color: '#00c389'
-  },
-  {
-    id: 'huobi',
-    name: 'Huobi',
-    logo: '/logos/huobi.svg',
-    color: '#1c2e5a'
   }
 ];
 
@@ -49,51 +25,11 @@ export const CURRENT_PRICES = {
       change24h: 0.42,
       volume24h: 1250000,
       updatedAt: new Date().toISOString()
-    },
-    {
-      exchange: 'kraken',
-      name: 'Kraken',
-      bid: 6.94,
-      ask: 6.97,
-      last: 6.96,
-      change24h: 0.35,
-      volume24h: 890000,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      exchange: 'coinbase',
-      name: 'Coinbase',
-      bid: 6.96,
-      ask: 6.99,
-      last: 6.98,
-      change24h: 0.50,
-      volume24h: 1100000,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      exchange: 'bitso',
-      name: 'Bitso',
-      bid: 6.93,
-      ask: 6.96,
-      last: 6.95,
-      change24h: 0.28,
-      volume24h: 450000,
-      updatedAt: new Date().toISOString()
-    },
-    {
-      exchange: 'huobi',
-      name: 'Huobi',
-      bid: 6.95,
-      ask: 6.98,
-      last: 6.97,
-      change24h: 0.42,
-      volume24h: 680000,
-      updatedAt: new Date().toISOString()
     }
   ],
-  average: 6.966,
-  bestBuy: { exchange: 'bitso', price: 6.93 },
-  bestSell: { exchange: 'coinbase', price: 6.99 }
+  average: 6.97,
+  bestBuy: { exchange: 'binance', price: 6.95 },
+  bestSell: { exchange: 'binance', price: 6.98 }
 };
 
 // Generate price history data points
@@ -101,7 +37,7 @@ function generatePriceHistory(days = 7, basePrice = 6.95) {
   const dataPoints = [];
   const now = new Date();
   const pointsPerDay = 24; // hourly data
-  
+
   for (let i = days * pointsPerDay; i >= 0; i--) {
     const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000);
     const volatility = 0.02;
@@ -110,7 +46,7 @@ function generatePriceHistory(days = 7, basePrice = 6.95) {
     const close = open + (Math.random() - 0.5) * volatility;
     const high = Math.max(open, close) + Math.random() * 0.01;
     const low = Math.min(open, close) - Math.random() * 0.01;
-    
+
     dataPoints.push({
       timestamp: timestamp.toISOString(),
       open: parseFloat(open.toFixed(4)),
@@ -119,10 +55,10 @@ function generatePriceHistory(days = 7, basePrice = 6.95) {
       close: parseFloat(close.toFixed(4)),
       volume: Math.floor(Math.random() * 100000) + 50000
     });
-    
+
     basePrice = close;
   }
-  
+
   return dataPoints;
 }
 

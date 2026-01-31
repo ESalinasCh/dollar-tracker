@@ -2,7 +2,7 @@ import './styles/index.css';
 import './styles/components.css';
 import './styles/layout.css';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import Sidebar from './components/common/Sidebar';
 import Header from './components/common/Header';
 import Dashboard from './pages/Dashboard';

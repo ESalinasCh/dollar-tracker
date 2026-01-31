@@ -1,3 +1,4 @@
+import React from 'react';
 import {
     BarChart,
     Bar,
@@ -12,11 +13,7 @@ import PropTypes from 'prop-types';
 
 // Exchange colors
 const EXCHANGE_COLORS = {
-    binance: '#f3ba2f',
-    kraken: '#5741d9',
-    coinbase: '#0052ff',
-    bitso: '#00c389',
-    huobi: '#1c2e5a'
+    binance: '#f3ba2f'
 };
 
 // Custom tooltip
