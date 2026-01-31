@@ -47,16 +47,7 @@ function MetricCard({ title, value, change, subtitle }) {
 function ExchangeItem({ exchange }) {
     const isPositive = exchange.change_24h >= 0;
     const colors = {
-        binance: '#f3ba2f',
-        kraken: '#5741d9',
-        coinbase: '#0052ff',
-        bitso: '#00c389',
-        huobi: '#1c2e5a',
-        exchangerate_api: '#2c3e50',
-        dolarapi: '#27ae60',
-        bluelytics: '#2980b9',
-        dolarapi_binance: '#f3ba2f',
-        dolarapi_oficial: '#2c3e50'
+        binance: '#f3ba2f'
     };
 
     return (

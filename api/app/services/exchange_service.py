@@ -30,14 +30,8 @@ class ExchangeService:
         self._cache: dict = {}
         self._cache_time: dict = {}
         self._source_status: dict = {
-            "coinbase": "unknown",
-            "exchangerate_api": "unknown",
             "binance": "unknown",
-            "dolarapi": "unknown",
         }
-        self._coinbase_bob_rate: float = 6.96  # Official rate cache
-        self._exchangerate_bob: float = 6.92  # ExchangeRate-API rate
-        self._binance_usdt_ars: float = 1500.0  # Binance USDT/ARS reference
     
     async def get_current_prices(self) -> CurrentPricesResponse:
         """Get current exchange rates from available sources."""
@@ -51,47 +45,8 @@ class ExchangeService:
         source_used = "unknown"
         sources_active = []
         
-        # Fetch official BOB rate from Coinbase first
-        try:
-            coinbase_rate = await self._fetch_coinbase_bob()
-            if coinbase_rate:
-                self._coinbase_bob_rate = coinbase_rate
-                self._source_status["coinbase"] = "active"
-                sources_active.append("Coinbase")
-        except Exception as e:
-            logger.error(f"Coinbase error: {e}")
-            self._source_status["coinbase"] = "error"
-        
-        # Fetch from ExchangeRate-API (official rates)
-        try:
-            exchangerate_bob = await self._fetch_exchangerate_api()
-            if exchangerate_bob:
-                self._exchangerate_bob = exchangerate_bob
-                self._source_status["exchangerate_api"] = "active"
-                sources_active.append("ExchangeRate-API")
-                # Add ExchangeRate-API as a price source
-                prices.append(ExchangePrice(
-                    exchange="exchangerate_api",
-                    name="ExchangeRate-API (Oficial)",
-                    bid=round(exchangerate_bob * 0.995, 2),
-                    ask=round(exchangerate_bob * 1.005, 2),
-                    last=round(exchangerate_bob, 2),
-                    change_24h=0.0,
-                    updated_at=datetime.utcnow(),
-                ))
-        except Exception as e:
-            logger.error(f"ExchangeRate-API error: {e}")
-            self._source_status["exchangerate_api"] = "error"
-        
         # Fetch Binance P2P (Real BOB Rates)
         try:
-            # P2P BUY order means I want to BUY USDT paying BOB -> Use "SELL" ad type (Advertisers SELLING USDT)
-            # P2P SELL order means I want to SELL USDT receiving BOB -> Use "BUY" ad type (Advertisers BUYING USDT)
-            # BUT: Binance API tradeType "BUY" means "Ads where users can BUY".
-            # So:
-            # tradeType="BUY" -> Users BUY USDT -> Advertiser SELLS -> This is the ASK price
-            # tradeType="SELL" -> Users SELL USDT -> Advertiser BUYS -> This is the BID price
-            
             p2p_buy_usdt = await self._fetch_binance_p2p(trade_type="BUY")  # User Buys = Ask
             p2p_sell_usdt = await self._fetch_binance_p2p(trade_type="SELL") # User Sells = Bid
             
@@ -113,17 +68,6 @@ class ExchangeService:
             logger.error(f"Binance error: {e}")
             self._source_status["binance"] = "error"
         
-        # Try DolarAPI (Bolivia Endpoint)
-        try:
-            dolar_data = await self._fetch_dolarapi()
-            if dolar_data:
-                prices.extend(dolar_data)
-                sources_active.append("DolarAPI")
-                self._source_status["dolarapi"] = "active"
-        except Exception as e:
-            logger.error(f"DolarAPI error: {e}")
-            self._source_status["dolarapi"] = "error"
-        
         # Set source used
         if sources_active:
             source_used = " + ".join(sources_active)
@@ -143,14 +87,20 @@ class ExchangeService:
             best_buy = BestPrice(exchange="unknown", price=6.95)
             best_sell = BestPrice(exchange="unknown", price=6.98)
         
+        # Handle BestPrice object vs ExchangePrice
+        if isinstance(best_buy, ExchangePrice):
+            best_buy = BestPrice(exchange=best_buy.exchange, price=best_buy.bid)
+        if isinstance(best_sell, ExchangePrice):
+            best_sell = BestPrice(exchange=best_sell.exchange, price=best_sell.ask)
+
         response = CurrentPricesResponse(
             timestamp=datetime.utcnow(),
             base_currency="USD",
             quote_currency="BOB",
             prices=prices,
             average=round(avg_price, 4),
-            best_buy=BestPrice(exchange=best_buy.exchange, price=best_buy.bid),
-            best_sell=BestPrice(exchange=best_sell.exchange, price=best_sell.ask),
+            best_buy=best_buy,
+            best_sell=best_sell,
             source=source_used,
         )
         
@@ -238,31 +188,10 @@ class ExchangeService:
         
         sources = [
             SourceInfo(
-                id="coinbase",
-                name="Coinbase",
-                url="https://coinbase.com",
-                status=self._source_status.get("coinbase", "unknown"),
-                last_check=datetime.utcnow(),
-            ),
-            SourceInfo(
-                id="exchangerate_api",
-                name="ExchangeRate-API",
-                url="https://exchangerate-api.com",
-                status=self._source_status.get("exchangerate_api", "unknown"),
-                last_check=datetime.utcnow(),
-            ),
-            SourceInfo(
                 id="binance",
                 name="Binance P2P",
                 url="https://p2p.binance.com",
                 status=self._source_status.get("binance", "unknown"),
-                last_check=datetime.utcnow(),
-            ),
-            SourceInfo(
-                id="dolarapi",
-                name="DolarAPI.com",
-                url="https://dolarapi.com",
-                status=self._source_status.get("dolarapi", "unknown"),
                 last_check=datetime.utcnow(),
             ),
         ]
@@ -273,34 +202,9 @@ class ExchangeService:
     # Private Methods
     # ============================================
     
-    async def _fetch_coinbase_bob(self) -> float:
-        """Fetch official USD/BOB rate from Coinbase."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://api.coinbase.com/v2/exchange-rates?currency=USD")
-            response.raise_for_status()
-            data = response.json()
-            
-            bob_rate = data.get("data", {}).get("rates", {}).get("BOB")
-            if bob_rate:
-                return float(bob_rate)
-            return 6.96  # Default fallback
-    
-    async def _fetch_exchangerate_api(self) -> float:
-        """Fetch official USD/BOB rate from ExchangeRate-API."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get("https://api.exchangerate-api.com/v4/latest/USD")
-            response.raise_for_status()
-            data = response.json()
-            
-            bob_rate = data.get("rates", {}).get("BOB")
-            if bob_rate:
-                return float(bob_rate)
-            return 6.92  # Default fallback
-    
     async def _fetch_binance_p2p(self, trade_type: str = "BUY") -> float:
         """
         Fetch P2P rates from Binance (USDT/BOB).
-        trade_type: "BUY" (what users pay to buy USDT) or "SELL" (what users get selling USDT)
         """
         url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
         headers = {
@@ -341,83 +245,20 @@ class ExchangeService:
             logger.error(f"Binance P2P {trade_type} error: {e}")
             return 0.0
 
-    async def _fetch_binance_usdt_ars(self) -> float:
-        # Keep for backward compatibility or reference if needed, 
-        # but P2P is now primary for BOB
-        return 1500.0
-    
-    async def _fetch_dolarapi(self) -> list[ExchangePrice]:
-        """Fetch data from DolarAPI.com (Bolivia Endpoint)."""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{settings.dolar_api_url}/dolares")
-            response.raise_for_status()
-            data = response.json()
-            
-            prices = []
-            for item in data:
-                # Map 'casa' to exchange
-                exchange_id = f"dolarapi_{item.get('casa', 'unknown').lower()}"
-                
-                # Check for valid prices (Binance might have None for compra)
-                bid = item.get("compra") or 0.0
-                ask = item.get("venta") or 0.0
-                
-                if bid == 0 and ask == 0:
-                    continue
-                    
-                # Calculate last price
-                if bid > 0 and ask > 0:
-                    last = (bid + ask) / 2
-                elif ask > 0: # If only ask (sell) price exists (like Binance here)
-                    last = ask
-                else:
-                    last = bid
-                    
-                prices.append(ExchangePrice(
-                    exchange=exchange_id, # 'oficial' or 'binance'
-                    name=item.get("nombre", item.get("casa", "Unknown")),
-                    bid=float(bid),
-                    ask=float(ask),
-                    last=round(float(last), 2),
-                    change_24h=0.0,
-                    updated_at=datetime.fromisoformat(
-                        item.get("fechaActualizacion", datetime.utcnow().isoformat()).replace("Z", "+00:00")
-                    ) if item.get("fechaActualizacion") else datetime.utcnow(),
-                ))
-            
-            return prices
-    
     def _get_mock_prices(self) -> list[ExchangePrice]:
         """Return mock prices for development."""
         now = datetime.utcnow()
-        base_price = 6.96
-        
-        exchanges = [
-            ("binance", "Binance", 0.01),
-            ("kraken", "Kraken", -0.01),
-            ("coinbase", "Coinbase", 0.02),
-            ("bitso", "Bitso", -0.02),
-            ("huobi", "Huobi", 0.0),
-        ]
-        
-        prices = []
-        for exchange_id, name, offset in exchanges:
-            bid = round(base_price + offset - 0.02, 2)
-            ask = round(base_price + offset + 0.01, 2)
-            last = round((bid + ask) / 2, 2)
-            
-            prices.append(ExchangePrice(
-                exchange=exchange_id,
-                name=name,
-                bid=bid,
-                ask=ask,
-                last=last,
-                change_24h=round(random.uniform(-0.5, 0.5), 2),
-                volume_24h=random.randint(100000, 2000000),
-                updated_at=now,
-            ))
-        
-        return prices
+        # Cleaned mock data - Only Binance
+        return [ExchangePrice(
+            exchange="binance",
+            name="Binance",
+            bid=6.95,
+            ask=6.98,
+            last=6.97,
+            change_24h=0.01,
+            volume_24h=1200000,
+            updated_at=now,
+        )]
     
     def _generate_price_history(self, days: float) -> list[PriceDataPoint]:
         """Generate simulated price history."""
@@ -434,11 +275,8 @@ class ExchangeService:
         elif days <= 7:
             num_points = 7 * 24
             delta = timedelta(hours=1)
-        elif days <= 30:
-            num_points = 30
-            delta = timedelta(days=1)
         else:
-            num_points = 365
+            num_points = 30
             delta = timedelta(days=1)
         
         base_price = 6.96
