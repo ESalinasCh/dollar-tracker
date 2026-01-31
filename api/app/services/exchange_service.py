@@ -30,12 +30,15 @@ class ExchangeService:
         self._cache: dict = {}
         self._cache_time: dict = {}
         self._source_status: dict = {
+            "coinbase": "unknown",
+            "exchangerate_api": "unknown",
+            "binance": "unknown",
             "dolarapi": "unknown",
             "bluelytics": "unknown",
-            "coinbase": "unknown",
-            "exchangerate": "unknown",
         }
         self._coinbase_bob_rate: float = 6.96  # Official rate cache
+        self._exchangerate_bob: float = 6.92  # ExchangeRate-API rate
+        self._binance_usdt_ars: float = 1500.0  # Binance USDT/ARS reference
     
     async def get_current_prices(self) -> CurrentPricesResponse:
         """Get current exchange rates from available sources."""
@@ -47,6 +50,7 @@ class ExchangeService:
         
         prices = []
         source_used = "unknown"
+        sources_active = []
         
         # Fetch official BOB rate from Coinbase first
         try:
@@ -54,20 +58,76 @@ class ExchangeService:
             if coinbase_rate:
                 self._coinbase_bob_rate = coinbase_rate
                 self._source_status["coinbase"] = "active"
+                sources_active.append("Coinbase")
         except Exception as e:
             logger.error(f"Coinbase error: {e}")
             self._source_status["coinbase"] = "error"
         
-        # Try DolarAPI first (Argentina blue rate as reference)
+        # Fetch from ExchangeRate-API (official rates)
+        try:
+            exchangerate_bob = await self._fetch_exchangerate_api()
+            if exchangerate_bob:
+                self._exchangerate_bob = exchangerate_bob
+                self._source_status["exchangerate_api"] = "active"
+                sources_active.append("ExchangeRate-API")
+                # Add ExchangeRate-API as a price source
+                prices.append(ExchangePrice(
+                    exchange="exchangerate_api",
+                    name="ExchangeRate-API (Oficial)",
+                    bid=round(exchangerate_bob * 0.995, 2),
+                    ask=round(exchangerate_bob * 1.005, 2),
+                    last=round(exchangerate_bob, 2),
+                    change_24h=0.0,
+                    updated_at=datetime.utcnow(),
+                ))
+        except Exception as e:
+            logger.error(f"ExchangeRate-API error: {e}")
+            self._source_status["exchangerate_api"] = "error"
+        
+        # Fetch Binance P2P (Real BOB Rates)
+        try:
+            # P2P BUY order means I want to BUY USDT paying BOB -> Use "SELL" ad type (Advertisers SELLING USDT)
+            # P2P SELL order means I want to SELL USDT receiving BOB -> Use "BUY" ad type (Advertisers BUYING USDT)
+            # BUT: Binance API tradeType "BUY" means "Ads where users can BUY".
+            # So:
+            # tradeType="BUY" -> Users BUY USDT -> Advertiser SELLS -> This is the ASK price
+            # tradeType="SELL" -> Users SELL USDT -> Advertiser BUYS -> This is the BID price
+            
+            p2p_buy_usdt = await self._fetch_binance_p2p(trade_type="BUY")  # User Buys = Ask
+            p2p_sell_usdt = await self._fetch_binance_p2p(trade_type="SELL") # User Sells = Bid
+            
+            if p2p_buy_usdt and p2p_sell_usdt:
+                self._source_status["binance"] = "active"
+                sources_active.append("Binance P2P")
+                
+                prices.append(ExchangePrice(
+                    exchange="binance",
+                    name="Binance P2P (USDT)",
+                    bid=round(p2p_sell_usdt, 2), # Price to sell USDT (receive BOB)
+                    ask=round(p2p_buy_usdt, 2),  # Price to buy USDT (pay BOB)
+                    last=round((p2p_buy_usdt + p2p_sell_usdt) / 2, 2),
+                    change_24h=0.0,
+                    updated_at=datetime.utcnow(),
+                    volume_24h=None
+                ))
+        except Exception as e:
+            logger.error(f"Binance error: {e}")
+            self._source_status["binance"] = "error"
+        
+        # Try DolarAPI (Argentina blue rate as reference)
         try:
             dolar_data = await self._fetch_dolarapi()
             if dolar_data:
                 prices.extend(dolar_data)
-                source_used = "DolarAPI.com + Coinbase"
+                sources_active.append("DolarAPI")
                 self._source_status["dolarapi"] = "active"
         except Exception as e:
             logger.error(f"DolarAPI error: {e}")
             self._source_status["dolarapi"] = "error"
+        
+        # Set source used
+        if sources_active:
+            source_used = " + ".join(sources_active)
         
         # Try Bluelytics as backup
         if not prices:
@@ -198,6 +258,20 @@ class ExchangeService:
                 last_check=datetime.utcnow(),
             ),
             SourceInfo(
+                id="exchangerate_api",
+                name="ExchangeRate-API",
+                url="https://exchangerate-api.com",
+                status=self._source_status.get("exchangerate_api", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="binance",
+                name="Binance P2P",
+                url="https://p2p.binance.com",
+                status=self._source_status.get("binance", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
                 id="dolarapi",
                 name="DolarAPI.com",
                 url="https://dolarapi.com",
@@ -209,13 +283,6 @@ class ExchangeService:
                 name="Bluelytics",
                 url="https://bluelytics.com.ar",
                 status=self._source_status.get("bluelytics", "unknown"),
-                last_check=datetime.utcnow(),
-            ),
-            SourceInfo(
-                id="exchangerate",
-                name="ExchangeRate-API",
-                url="https://exchangerate-api.com",
-                status=self._source_status.get("exchangerate", "unknown"),
                 last_check=datetime.utcnow(),
             ),
         ]
@@ -237,6 +304,67 @@ class ExchangeService:
             if bob_rate:
                 return float(bob_rate)
             return 6.96  # Default fallback
+    
+    async def _fetch_exchangerate_api(self) -> float:
+        """Fetch official USD/BOB rate from ExchangeRate-API."""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get("https://api.exchangerate-api.com/v4/latest/USD")
+            response.raise_for_status()
+            data = response.json()
+            
+            bob_rate = data.get("rates", {}).get("BOB")
+            if bob_rate:
+                return float(bob_rate)
+            return 6.92  # Default fallback
+    
+    async def _fetch_binance_p2p(self, trade_type: str = "BUY") -> float:
+        """
+        Fetch P2P rates from Binance (USDT/BOB).
+        trade_type: "BUY" (what users pay to buy USDT) or "SELL" (what users get selling USDT)
+        """
+        url = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search"
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "Mozilla/5.0",
+        }
+        payload = {
+            "fiat": "BOB",
+            "page": 1,
+            "rows": 5,
+            "tradeType": trade_type, 
+            "asset": "USDT",
+            "countries": [],
+            "proMerchantAds": False,
+            "shieldMerchantAds": False,
+            "publisherType": None,
+            "payTypes": [],
+            "classifies": ["mass", "profession"]
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                
+                ads = data.get("data", [])
+                if not ads:
+                    return 0.0
+                
+                # Get average of top 3 prices to avoid outliers
+                valid_ads = [float(ad["adv"]["price"]) for ad in ads[:3] if ad.get("adv", {}).get("price")]
+                if not valid_ads:
+                    return 0.0
+                    
+                return sum(valid_ads) / len(valid_ads)
+        except Exception as e:
+            logger.error(f"Binance P2P {trade_type} error: {e}")
+            return 0.0
+
+    async def _fetch_binance_usdt_ars(self) -> float:
+        # Keep for backward compatibility or reference if needed, 
+        # but P2P is now primary for BOB
+        return 1500.0
     
     async def _fetch_dolarapi(self) -> list[ExchangePrice]:
         """Fetch data from DolarAPI.com."""
