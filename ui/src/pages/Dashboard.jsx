@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
-import { PRICE_HISTORY, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
+import { PRICE_HISTORY, formatCurrency, formatPercent } from '../data/mockData';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -19,25 +19,20 @@ const ArrowDownIcon = () => (
     </svg>
 );
 
-const PlusIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-);
-
 // Metric Card Component
-function MetricCard({ title, value, change, subtitle }) {
+function MetricCard({ title, value, subtitle, showChange = true, change = 0 }) {
     const isPositive = change >= 0;
 
     return (
         <Card className="metric-card">
             <div className="card-title" style={{ marginBottom: '12px' }}>{title}</div>
             <div className="metric-value">{value}</div>
-            <div className={`metric-change ${isPositive ? 'positive' : 'negative'}`}>
-                {isPositive ? <ArrowUpIcon /> : <ArrowDownIcon />}
-                <span>{formatPercent(change)}</span>
-            </div>
+            {showChange && (
+                <div className={`metric-change ${isPositive ? 'positive' : 'negative'}`}>
+                    {isPositive ? <ArrowUpIcon /> : <ArrowDownIcon />}
+                    <span>{formatPercent(change)}</span>
+                </div>
+            )}
             {subtitle && <div className="metric-label">{subtitle}</div>}
         </Card>
     );
@@ -45,7 +40,6 @@ function MetricCard({ title, value, change, subtitle }) {
 
 // Exchange Item Component
 function ExchangeItem({ exchange }) {
-    const isPositive = exchange.change_24h >= 0;
     const colors = {
         binance: '#f3ba2f'
     };
@@ -66,38 +60,11 @@ function ExchangeItem({ exchange }) {
                 <div className="exchange-price-value">
                     {formatCurrency(exchange.last)}
                 </div>
-                <div className={`exchange-price-change ${isPositive ? 'positive' : 'negative'}`}>
-                    {isPositive ? '↑' : '↓'} {formatPercent(exchange.change_24h || 0)}
+                <div className="exchange-price-details">
+                    <span className="text-success">Bid: {formatCurrency(exchange.bid)}</span>
+                    <span className="text-danger">Ask: {formatCurrency(exchange.ask)}</span>
                 </div>
             </div>
-        </div>
-    );
-}
-
-// Alert Item Component  
-function AlertItem({ alert }) {
-    const isUp = alert.type === 'price_above';
-
-    return (
-        <div className="alert-item">
-            <div className={`alert-icon ${isUp ? 'up' : 'down'}`}>
-                {isUp ? <ArrowUpIcon /> : <ArrowDownIcon />}
-            </div>
-            <div className="alert-info">
-                <div className="alert-condition">
-                    USD {isUp ? '>' : '<'} {alert.threshold.toFixed(2)}
-                </div>
-                <div className="alert-exchange">
-                    {alert.exchange === 'all' ? 'All exchanges' : alert.exchange}
-                </div>
-            </div>
-            <Badge
-                variant={alert.enabled ? 'success' : 'neutral'}
-                withDot
-                animated={alert.enabled}
-            >
-                {alert.enabled ? 'Active' : 'Paused'}
-            </Badge>
         </div>
     );
 }
@@ -116,6 +83,7 @@ function Dashboard() {
     const [currentData, setCurrentData] = useState({ prices: [], average: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [lastUpdate, setLastUpdate] = useState(null);
 
     const priceHistoryData = PRICE_HISTORY[selectedPeriod] || PRICE_HISTORY['24h'];
 
@@ -131,30 +99,29 @@ function Dashboard() {
                     prices: data.prices,
                     average: data.average
                 });
+                setLastUpdate(new Date());
                 setIsLoading(false);
+                setError(null);
             } catch (err) {
                 console.error("API Fetch Error:", err);
-                // Fallback to mock data on error? Or show error state
                 setError(err.message);
                 setIsLoading(false);
             }
         };
 
         fetchData();
-        // Poll every 30 seconds
+        // Poll every 30 seconds (US1: auto-refresh)
         const interval = setInterval(fetchData, 30000);
         return () => clearInterval(interval);
     }, []);
 
     const { prices, average } = currentData;
 
-    // Calculate total volume (if available)
-    const totalVolume = prices.reduce((sum, p) => sum + (p.volume_24h || 0), 0);
-
-    // Calculate average change
-    const avgChange = prices.length > 0
-        ? prices.reduce((sum, p) => sum + (p.change_24h || 0), 0) / prices.length
-        : 0;
+    // Get the first (and only) exchange price for Bid/Ask display
+    const primaryExchange = prices[0] || {};
+    const spread = primaryExchange.bid && primaryExchange.ask
+        ? Math.abs(primaryExchange.bid - primaryExchange.ask).toFixed(2)
+        : '0.00';
 
     if (isLoading && prices.length === 0) {
         return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
@@ -167,69 +134,68 @@ function Dashboard() {
                 <div>
                     <h1 className="page-title">Dashboard</h1>
                     <p className="page-subtitle">
-                        Real-time dollar price tracking across exchanges
-                        {error && <span style={{ color: 'red', marginLeft: '10px' }}>(Offline Mode)</span>}
+                        Real-time dollar price tracking
+                        {error && <span style={{ color: 'var(--color-danger)', marginLeft: '10px' }}>(Offline Mode)</span>}
+                        {lastUpdate && !error && (
+                            <span style={{ marginLeft: '10px', opacity: 0.7 }}>
+                                Last update: {lastUpdate.toLocaleTimeString()}
+                            </span>
+                        )}
                     </p>
-                </div>
-                <div className="page-actions">
-                    <button className="btn btn-secondary">
-                        Export
-                    </button>
-                    <button className="btn btn-primary">
-                        <PlusIcon /> Add Alert
-                    </button>
                 </div>
             </div>
 
-            {/* Metrics Grid */}
+            {/* Metrics Grid - US1: Ver valor del dólar paralelo */}
             <div className="metrics-grid">
                 <MetricCard
                     title="Current USD/BOB Price"
                     value={formatCurrency(average)}
-                    change={avgChange}
-                    subtitle="Average across exchanges"
+                    showChange={false}
+                    subtitle="Binance P2P Average"
                 />
                 <MetricCard
-                    title="24h Change"
-                    value={formatPercent(avgChange)}
-                    change={avgChange}
-                    subtitle="From yesterday"
+                    title="Best Bid (Sell USDT)"
+                    value={formatCurrency(primaryExchange.bid || 0)}
+                    showChange={false}
+                    subtitle="Price to sell your USDT"
                 />
                 <MetricCard
-                    title="24h Volume"
-                    value={formatVolume(totalVolume)}
-                    change={0}
-                    subtitle="Total trading volume"
+                    title="Best Ask (Buy USDT)"
+                    value={formatCurrency(primaryExchange.ask || 0)}
+                    showChange={false}
+                    subtitle="Price to buy USDT"
                 />
             </div>
 
             {/* Main Content Grid */}
             <div className="dashboard-grid">
-                {/* Left Column - Chart */}
+                {/* Left Column - Chart (US2: Ver gráficos históricos) */}
                 <div>
-                    <Card title="Price History" action={
-                        <div className="nav-tabs">
-                            {TIME_PERIODS.map(period => (
-                                <button
-                                    key={period.key}
-                                    className={`nav-tab ${selectedPeriod === period.key ? 'active' : ''}`}
-                                    onClick={() => setSelectedPeriod(period.key)}
-                                >
-                                    {period.label}
-                                </button>
-                            ))}
-                        </div>
-                    }>
+                    <Card title="Price History"
+                        subtitle="* Simulated data for demonstration"
+                        action={
+                            <div className="nav-tabs">
+                                {TIME_PERIODS.map(period => (
+                                    <button
+                                        key={period.key}
+                                        className={`nav-tab ${selectedPeriod === period.key ? 'active' : ''}`}
+                                        onClick={() => setSelectedPeriod(period.key)}
+                                    >
+                                        {period.label}
+                                    </button>
+                                ))}
+                            </div>
+                        }>
                         <div style={{ minHeight: '300px' }}>
                             <PriceLineChart data={priceHistoryData} height={300} />
                         </div>
                     </Card>
                 </div>
 
-                {/* Right Column - Exchanges & Alerts */}
+                {/* Right Column - Exchange Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
-                    {/* Exchanges */}
-                    <Card title="Exchange Prices">
+                    {/* Exchange Prices */}
+                    <Card title="Exchange Prices" subtitle="Live data from Binance P2P">
                         <div className="exchange-list">
                             {prices.map((exchange) => (
                                 <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
@@ -237,15 +203,21 @@ function Dashboard() {
                         </div>
                     </Card>
 
-                    {/* Alerts */}
-                    <Card
-                        title="Active Alerts"
-                        action={<Badge variant="primary">{ALERTS.filter(a => a.enabled).length} Active</Badge>}
-                    >
-                        <div className="alerts-panel">
-                            {ALERTS.slice(0, 3).map((alert) => (
-                                <AlertItem key={alert.id} alert={alert} />
-                            ))}
+                    {/* Price Details */}
+                    <Card title="Price Details">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                <span className="text-muted">Spread</span>
+                                <span className="text-primary">{spread} BOB</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                <span className="text-muted">Source</span>
+                                <Badge variant="success">Binance P2P</Badge>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
+                                <span className="text-muted">Auto-refresh</span>
+                                <span>Every 30s</span>
+                            </div>
                         </div>
                     </Card>
                 </div>

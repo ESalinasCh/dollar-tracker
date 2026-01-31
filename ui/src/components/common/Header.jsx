@@ -1,6 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import NotificationCenter from './NotificationCenter';
 
 // Icon components
 const MenuIcon = () => (
@@ -12,7 +11,6 @@ const MenuIcon = () => (
 );
 
 function Header({ title, onMenuClick }) {
-
     return (
         <header className="header">
             <div className="header-left">
@@ -36,10 +34,7 @@ function Header({ title, onMenuClick }) {
             </div>
 
             <div className="header-right">
-                {/* Notifications */}
-                <NotificationCenter />
-
-                {/* User avatar */}
+                {/* User avatar (US3: acceso anónimo - no login required) */}
                 <div
                     className="header-action"
                     style={{
