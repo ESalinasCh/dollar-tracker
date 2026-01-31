@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
-import { CURRENT_PRICES, PRICE_HISTORY, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
+import { PRICE_HISTORY, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -45,13 +45,16 @@ function MetricCard({ title, value, change, subtitle }) {
 
 // Exchange Item Component
 function ExchangeItem({ exchange }) {
-    const isPositive = exchange.change24h >= 0;
+    const isPositive = exchange.change_24h >= 0;
     const colors = {
         binance: '#f3ba2f',
         kraken: '#5741d9',
         coinbase: '#0052ff',
         bitso: '#00c389',
-        huobi: '#1c2e5a'
+        huobi: '#1c2e5a',
+        exchangerate_api: '#2c3e50',
+        dolarapi: '#27ae60',
+        bluelytics: '#2980b9'
     };
 
     return (
@@ -71,7 +74,7 @@ function ExchangeItem({ exchange }) {
                     {formatCurrency(exchange.last)}
                 </div>
                 <div className={`exchange-price-change ${isPositive ? 'positive' : 'negative'}`}>
-                    {isPositive ? '↑' : '↓'} {formatPercent(exchange.change24h)}
+                    {isPositive ? '↑' : '↓'} {formatPercent(exchange.change_24h || 0)}
                 </div>
             </div>
         </div>
@@ -117,14 +120,52 @@ const TIME_PERIODS = [
 
 function Dashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('24h');
-    const { prices, average } = CURRENT_PRICES;
+    const [currentData, setCurrentData] = useState({ prices: [], average: 0 });
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
     const priceHistoryData = PRICE_HISTORY[selectedPeriod] || PRICE_HISTORY['24h'];
 
-    // Calculate total volume
-    const totalVolume = prices.reduce((sum, p) => sum + p.volume24h, 0);
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const response = await fetch('http://localhost:3001/api/v1/prices/current');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+                const data = await response.json();
+                setCurrentData({
+                    prices: data.prices,
+                    average: data.average
+                });
+                setIsLoading(false);
+            } catch (err) {
+                console.error("API Fetch Error:", err);
+                // Fallback to mock data on error? Or show error state
+                setError(err.message);
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+        // Poll every 30 seconds
+        const interval = setInterval(fetchData, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const { prices, average } = currentData;
+
+    // Calculate total volume (if available)
+    const totalVolume = prices.reduce((sum, p) => sum + (p.volume_24h || 0), 0);
 
     // Calculate average change
-    const avgChange = prices.reduce((sum, p) => sum + p.change24h, 0) / prices.length;
+    const avgChange = prices.length > 0
+        ? prices.reduce((sum, p) => sum + (p.change_24h || 0), 0) / prices.length
+        : 0;
+
+    if (isLoading && prices.length === 0) {
+        return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
+    }
 
     return (
         <main className="main">
@@ -134,6 +175,7 @@ function Dashboard() {
                     <h1 className="page-title">Dashboard</h1>
                     <p className="page-subtitle">
                         Real-time dollar price tracking across exchanges
+                        {error && <span style={{ color: 'red', marginLeft: '10px' }}>(Offline Mode)</span>}
                     </p>
                 </div>
                 <div className="page-actions">
@@ -163,7 +205,7 @@ function Dashboard() {
                 <MetricCard
                     title="24h Volume"
                     value={formatVolume(totalVolume)}
-                    change={12.5}
+                    change={0}
                     subtitle="Total trading volume"
                 />
             </div>
@@ -197,7 +239,7 @@ function Dashboard() {
                     <Card title="Exchange Prices">
                         <div className="exchange-list">
                             {prices.map((exchange) => (
-                                <ExchangeItem key={exchange.exchange} exchange={exchange} />
+                                <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
                             ))}
                         </div>
                     </Card>
