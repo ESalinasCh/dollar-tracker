@@ -1,16 +1,16 @@
-// Mock data for Dollar Tracker application
+// Mock data for Dollar Tracker application (US1-6 Scope)
 // This file contains simulated data for development
 
 export const EXCHANGES = [
   {
     id: 'binance',
-    name: 'Binance',
+    name: 'Binance P2P',
     logo: '/logos/binance.svg',
     color: '#f3ba2f'
   }
 ];
 
-// Current prices mock data
+// Current prices mock data (US1)
 export const CURRENT_PRICES = {
   timestamp: new Date().toISOString(),
   baseCurrency: 'USD',
@@ -18,22 +18,22 @@ export const CURRENT_PRICES = {
   prices: [
     {
       exchange: 'binance',
-      name: 'Binance',
-      bid: 6.95,
-      ask: 6.98,
-      last: 6.97,
-      change24h: 0.42,
-      volume24h: 1250000,
+      name: 'Binance P2P (USDT)',
+      bid: 9.33,
+      ask: 9.10,
+      last: 9.21,
+      change24h: 0.0,
+      volume24h: null,
       updatedAt: new Date().toISOString()
     }
   ],
-  average: 6.97,
-  bestBuy: { exchange: 'binance', price: 6.95 },
-  bestSell: { exchange: 'binance', price: 6.98 }
+  average: 9.21,
+  bestBuy: { exchange: 'binance', price: 9.33 },
+  bestSell: { exchange: 'binance', price: 9.10 }
 };
 
-// Generate price history data points
-function generatePriceHistory(days = 7, basePrice = 6.95) {
+// Generate price history data points (US2)
+function generatePriceHistory(days = 7, basePrice = 9.20) {
   const dataPoints = [];
   const now = new Date();
   const pointsPerDay = 24; // hourly data
@@ -63,79 +63,12 @@ function generatePriceHistory(days = 7, basePrice = 6.95) {
 }
 
 export const PRICE_HISTORY = {
-  '1h': generatePriceHistory(0.042, 6.95), // ~1 hour
-  '24h': generatePriceHistory(1, 6.90),
-  '7d': generatePriceHistory(7, 6.85),
-  '30d': generatePriceHistory(30, 6.70),
-  '1y': generatePriceHistory(365, 6.50)
+  '1h': generatePriceHistory(0.042, 9.20),
+  '24h': generatePriceHistory(1, 9.15),
+  '7d': generatePriceHistory(7, 9.10),
+  '30d': generatePriceHistory(30, 9.00),
+  '1y': generatePriceHistory(365, 8.50)
 };
-
-// Volatility data
-export const VOLATILITY = {
-  period: '24h',
-  volatility: 0.8,
-  rating: 'low', // low, medium, high
-  standardDeviation: 0.023,
-  range: {
-    min: 6.90,
-    max: 6.99
-  }
-};
-
-// Sample alerts
-export const ALERTS = [
-  {
-    id: 'alert-001',
-    type: 'price_above',
-    threshold: 7.00,
-    exchange: 'all',
-    enabled: true,
-    createdAt: '2026-01-15T10:00:00Z',
-    triggeredAt: null
-  },
-  {
-    id: 'alert-002',
-    type: 'price_below',
-    threshold: 6.90,
-    exchange: 'all',
-    enabled: true,
-    createdAt: '2026-01-15T10:30:00Z',
-    triggeredAt: null
-  },
-  {
-    id: 'alert-003',
-    type: 'percent_change',
-    threshold: 1.0,
-    exchange: 'binance',
-    enabled: false,
-    createdAt: '2026-01-16T08:00:00Z',
-    triggeredAt: '2026-01-16T14:30:00Z'
-  }
-];
-
-// Sample reports
-export const REPORTS = [
-  {
-    id: 'report-001',
-    name: 'Weekly Report - Jan 10-17',
-    dateRange: { from: '2026-01-10', to: '2026-01-17' },
-    type: 'weekly',
-    format: 'pdf',
-    size: 1200000,
-    createdAt: '2026-01-17T08:00:00Z',
-    status: 'completed'
-  },
-  {
-    id: 'report-002',
-    name: 'Daily Report - Jan 16',
-    dateRange: { from: '2026-01-16', to: '2026-01-16' },
-    type: 'daily',
-    format: 'excel',
-    size: 450000,
-    createdAt: '2026-01-16T23:00:00Z',
-    status: 'completed'
-  }
-];
 
 // Helper function to format currency
 export function formatCurrency(value, decimals = 2) {
@@ -168,9 +101,6 @@ export default {
   EXCHANGES,
   CURRENT_PRICES,
   PRICE_HISTORY,
-  VOLATILITY,
-  ALERTS,
-  REPORTS,
   formatCurrency,
   formatPercent,
   formatVolume

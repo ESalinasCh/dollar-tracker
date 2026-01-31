@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 import logging
 import random
-import math
 
 from app.config import get_settings
 from app.models.schemas import (
@@ -13,8 +12,6 @@ from app.models.schemas import (
     PriceDataPoint,
     PriceHistorySummary,
     PriceHistoryResponse,
-    VolatilityResponse,
-    PriceRange,
     SourceInfo,
     SourcesResponse,
 )
@@ -149,40 +146,7 @@ class ExchangeService:
             summary=summary,
         )
     
-    async def get_volatility(self, period: str = "24h") -> VolatilityResponse:
-        """Calculate volatility metrics."""
-        
-        history = await self.get_price_history(period)
-        closes = [dp.close for dp in history.data_points]
-        
-        if len(closes) < 2:
-            std_dev = 0.0
-            volatility = 0.0
-        else:
-            mean = sum(closes) / len(closes)
-            variance = sum((x - mean) ** 2 for x in closes) / len(closes)
-            std_dev = math.sqrt(variance)
-            volatility = (std_dev / mean) * 100 if mean else 0.0
-        
-        # Determine rating
-        if volatility < 1.0:
-            rating = "low"
-        elif volatility < 3.0:
-            rating = "medium"
-        else:
-            rating = "high"
-        
-        return VolatilityResponse(
-            period=period,
-            volatility=round(volatility, 2),
-            rating=rating,
-            standard_deviation=round(std_dev, 4),
-            range=PriceRange(
-                min=round(min(closes), 4) if closes else 0,
-                max=round(max(closes), 4) if closes else 0,
-            ),
-        )
-    
+
     async def get_sources(self) -> SourcesResponse:
         """Get information about data sources."""
         

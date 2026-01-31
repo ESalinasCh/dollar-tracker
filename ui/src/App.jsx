@@ -7,12 +7,8 @@ import Sidebar from './components/common/Sidebar';
 import Header from './components/common/Header';
 import Dashboard from './pages/Dashboard';
 import Charts from './pages/Charts';
-import Alerts from './pages/Alerts';
-import Reports from './pages/Reports';
-import { NotificationProvider } from './context/NotificationContext';
-import ToastContainer from './components/common/Toast';
 
-function AppContent() {
+function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -22,13 +18,17 @@ function AppContent() {
         return <Dashboard />;
       case 'charts':
         return <Charts />;
-      case 'reports':
-        return <Reports />;
-      case 'alerts':
-        return <Alerts />;
       default:
         return <Dashboard />;
     }
+  };
+
+  const getPageTitle = () => {
+    const titles = {
+      dashboard: 'Dashboard',
+      charts: 'Gráficos Históricos'
+    };
+    return titles[currentPage] || 'Dashboard';
   };
 
   return (
@@ -41,21 +41,12 @@ function AppContent() {
       />
       <div className="app-content">
         <Header
-          title={currentPage.charAt(0).toUpperCase() + currentPage.slice(1)}
+          title={getPageTitle()}
           onMenuClick={() => setSidebarOpen(true)}
         />
         {renderPage()}
       </div>
-      <ToastContainer />
     </div>
-  );
-}
-
-function App() {
-  return (
-    <NotificationProvider>
-      <AppContent />
-    </NotificationProvider>
   );
 }
 

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from app.config import get_settings
-from app.routes import prices_router, stats_router, health_router
+from app.routes import prices_router, health_router
 
 # Configure logging
 logging.basicConfig(
@@ -25,12 +25,11 @@ app = FastAPI(
     Backend API for tracking USD/BOB exchange rates.
     
     ### Features
-    - **Current Prices**: Get real-time exchange rates from multiple sources
+    - **Current Prices**: Get real-time exchange rates from Binance P2P
     - **Historical Data**: View price history with different time intervals
-    - **Volatility Metrics**: Analyze market volatility
-    - **Multiple Sources**: Data from DolarAPI, Bluelytics, and more
+    - **Single Source**: Data from Binance P2P (USDT/BOB)
     
-    ### User Stories Supported
+    ### User Stories Supported (US1-6)
     - US1: Ver el valor del dólar paralelo
     - US2: Ver gráficos históricos
     - US3: Soporte a acceso anónimo (no auth required)
@@ -54,7 +53,6 @@ app.add_middleware(
 # Include routers
 app.include_router(health_router)
 app.include_router(prices_router, prefix="/api/v1")
-app.include_router(stats_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
