@@ -138,6 +138,9 @@ function Alerts() {
     };
 
     const activeCount = alerts.filter(a => a.enabled).length;
+    const pausedCount = alerts.filter(a => !a.enabled).length;
+    const priceAboveCount = alerts.filter(a => a.type === 'price_above').length;
+    const priceBelowCount = alerts.filter(a => a.type === 'price_below').length;
 
     return (
         <main className="main">
@@ -223,46 +226,138 @@ function Alerts() {
                 </Card>
             )}
 
-            {/* Current Price Reference */}
-            <Card style={{ marginBottom: 'var(--spacing-xl)', background: 'var(--color-bg-tertiary)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <div className="text-sm text-secondary">Current USD/BOB Price</div>
-                        <div className="text-2xl font-bold text-primary">${CURRENT_PRICES.average.toFixed(4)}</div>
-                    </div>
-                    <div className="text-sm text-muted">
-                        Use this as reference when setting alert thresholds
-                    </div>
+            {/* Two Column Layout */}
+            <div className="dashboard-grid">
+                {/* Left Column - Alerts List */}
+                <div>
+                    <Card title="Your Alerts" subtitle={`${alerts.length} total alerts configured`}>
+                        {alerts.length === 0 ? (
+                            <div style={{
+                                textAlign: 'center',
+                                padding: 'var(--spacing-2xl)',
+                                color: 'var(--color-text-muted)'
+                            }}>
+                                <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)' }}>🔔</div>
+                                <div>No alerts configured yet</div>
+                                <div className="text-sm" style={{ marginTop: '8px' }}>
+                                    Click "New Alert" to create your first price alert
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                                {alerts.map(alert => (
+                                    <AlertItem
+                                        key={alert.id}
+                                        alert={alert}
+                                        onToggle={handleToggle}
+                                        onDelete={handleDelete}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </Card>
                 </div>
-            </Card>
 
-            {/* Alerts List */}
-            <Card title="Your Alerts" subtitle={`${alerts.length} total alerts configured`}>
-                {alerts.length === 0 ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: 'var(--spacing-2xl)',
-                        color: 'var(--color-text-muted)'
-                    }}>
-                        <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)' }}>🔔</div>
-                        <div>No alerts configured yet</div>
-                        <div className="text-sm" style={{ marginTop: '8px' }}>
-                            Click "New Alert" to create your first price alert
+                {/* Right Column - Sidebar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
+                    {/* Current Price Reference */}
+                    <Card title="Current Price" subtitle="Use as reference for alerts">
+                        <div style={{
+                            padding: 'var(--spacing-lg)',
+                            background: 'var(--color-accent-light)',
+                            borderRadius: 'var(--radius-md)',
+                            textAlign: 'center'
+                        }}>
+                            <div className="text-3xl font-bold text-accent" style={{ marginBottom: 'var(--spacing-xs)' }}>
+                                ${CURRENT_PRICES.average.toFixed(4)}
+                            </div>
+                            <div className="text-sm text-secondary">USD/BOB Average</div>
                         </div>
-                    </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-                        {alerts.map(alert => (
-                            <AlertItem
-                                key={alert.id}
-                                alert={alert}
-                                onToggle={handleToggle}
-                                onDelete={handleDelete}
-                            />
-                        ))}
-                    </div>
-                )}
-            </Card>
+                    </Card>
+
+                    {/* Alert Statistics */}
+                    <Card title="Alert Statistics" subtitle="Overview of your alerts">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 'var(--spacing-sm) 0',
+                                borderBottom: '1px solid var(--color-border)'
+                            }}>
+                                <span className="text-secondary">Total Alerts</span>
+                                <span className="font-bold">{alerts.length}</span>
+                            </div>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 'var(--spacing-sm) 0',
+                                borderBottom: '1px solid var(--color-border)'
+                            }}>
+                                <span className="text-secondary">Active</span>
+                                <Badge variant="success">{activeCount}</Badge>
+                            </div>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 'var(--spacing-sm) 0',
+                                borderBottom: '1px solid var(--color-border)'
+                            }}>
+                                <span className="text-secondary">Paused</span>
+                                <Badge variant="neutral">{pausedCount}</Badge>
+                            </div>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 'var(--spacing-sm) 0',
+                                borderBottom: '1px solid var(--color-border)'
+                            }}>
+                                <span className="text-secondary">Price Above</span>
+                                <span className="font-medium text-success">{priceAboveCount}</span>
+                            </div>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                padding: 'var(--spacing-sm) 0'
+                            }}>
+                                <span className="text-secondary">Price Below</span>
+                                <span className="font-medium text-danger">{priceBelowCount}</span>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Quick Tips */}
+                    <Card title="Quick Tips" subtitle="How to use alerts">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+                            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'flex-start' }}>
+                                <span style={{ color: 'var(--color-success)' }}>↑</span>
+                                <div>
+                                    <div className="font-medium">Price Above</div>
+                                    <div className="text-sm text-muted">Get notified when USD rises above your target</div>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'flex-start' }}>
+                                <span style={{ color: 'var(--color-danger)' }}>↓</span>
+                                <div>
+                                    <div className="font-medium">Price Below</div>
+                                    <div className="text-sm text-muted">Get notified when USD drops below your target</div>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: 'var(--spacing-sm)', alignItems: 'flex-start' }}>
+                                <span style={{ color: 'var(--color-warning)' }}>%</span>
+                                <div>
+                                    <div className="font-medium">Percent Change</div>
+                                    <div className="text-sm text-muted">Get notified on significant price movements</div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            </div>
         </main>
     );
 }
