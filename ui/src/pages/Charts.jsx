@@ -3,7 +3,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
 import ExchangeComparison from '../components/charts/ExchangeComparison';
-import { CURRENT_PRICES, PRICE_HISTORY, VOLATILITY, formatCurrency, formatPercent } from '../data/mockData';
+import { CURRENT_PRICES, PRICE_HISTORY, formatCurrency, formatPercent } from '../data/mockData';
 
 // Time period options
 const TIME_PERIODS = [
@@ -74,8 +74,8 @@ function Charts() {
                 <Card className="metric-card">
                     <div className="card-title" style={{ marginBottom: '8px' }}>Volatility</div>
                     <div className="metric-value">
-                        <Badge variant={VOLATILITY.rating === 'low' ? 'success' : VOLATILITY.rating === 'medium' ? 'warning' : 'danger'}>
-                            {VOLATILITY.rating.toUpperCase()}
+                        <Badge variant={priceRange < 0.05 ? 'success' : priceRange < 0.15 ? 'warning' : 'danger'}>
+                            {priceRange < 0.05 ? 'LOW' : priceRange < 0.15 ? 'MEDIUM' : 'HIGH'}
                         </Badge>
                     </div>
                     <div className="metric-label">±{priceRange.toFixed(4)} range</div>

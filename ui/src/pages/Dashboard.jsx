@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
-import { PRICE_HISTORY, ALERTS, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
+import { PRICE_HISTORY, formatCurrency, formatPercent, formatVolume } from '../data/mockData';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -233,18 +233,6 @@ function Dashboard() {
                         <div className="exchange-list">
                             {prices.map((exchange) => (
                                 <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
-                            ))}
-                        </div>
-                    </Card>
-
-                    {/* Alerts */}
-                    <Card
-                        title="Active Alerts"
-                        action={<Badge variant="primary">{ALERTS.filter(a => a.enabled).length} Active</Badge>}
-                    >
-                        <div className="alerts-panel">
-                            {ALERTS.slice(0, 3).map((alert) => (
-                                <AlertItem key={alert.id} alert={alert} />
                             ))}
                         </div>
                     </Card>
