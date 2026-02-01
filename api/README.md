@@ -12,8 +12,14 @@ python -m venv venv
 .\venv\Scripts\activate
 
 # Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 ```
+
+## Prerequisites
+
+- **Python 3.10+**
+- **MongoDB** installed and running locally on port 27017 (for historical data)
 
 ## Run
 
@@ -35,5 +41,9 @@ uvicorn app.main:app --host 0.0.0.0 --port 3001
 | `/api/v1/stats/volatility` | GET | Volatility metrics |
 
 ## Data Sources
+## Data Sources
 - **Binance P2P** - Real-time market rates (USDT/BOB)
-- **Others** - [REMOVED] (DolarAPI, Coinbase, etc.)
+- **AirTM** - P2P rates
+- **Wallbit** - Fintech rates
+- **Takenos** - Fintech rates
+- **BCB** - Official Central Bank rate
