@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
-import { PRICE_HISTORY, formatCurrency, formatPercent } from '../data/mockData';
+import { formatCurrency, formatPercent } from '../data/mockData';
 
 // Time period options (US2: filtros de tiempo)
 const TIME_PERIODS = [
@@ -16,6 +16,8 @@ const TIME_PERIODS = [
 function Charts() {
     const [selectedPeriod, setSelectedPeriod] = useState('7d');
     const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Calculando...' });
+    const [historyData, setHistoryData] = useState([]);
+    const [historySummary, setHistorySummary] = useState({ avg_price: 0, min_price: 0, max_price: 0, change_percent: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
     // Fetch real-time data from API
@@ -33,10 +35,8 @@ function Charts() {
                         source: data.source
                     });
                 }
-                setIsLoading(false);
             } catch (err) {
                 console.error("API Error:", err);
-                setIsLoading(false);
             }
         };
         fetchData();
@@ -44,20 +44,34 @@ function Charts() {
         return () => clearInterval(interval);
     }, []);
 
-    // Price history data (mock - US2 shows historical trends)
-    const priceHistoryData = PRICE_HISTORY[selectedPeriod] || PRICE_HISTORY['24h'];
+    // Fetch historical data based on selected period
+    useEffect(() => {
+        const fetchHistory = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setHistoryData(data.data || []);
+                    setHistorySummary(data.summary || { avg_price: 0, min_price: 0, max_price: 0, change_percent: 0 });
+                }
+            } catch (err) {
+                console.error("History Error:", err);
+                setHistoryData([]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchHistory();
+    }, [selectedPeriod]);
 
-    // Calculate statistics from historical data
-    const allPrices = priceHistoryData.map(d => d.close);
-    const minPrice = Math.min(...allPrices);
-    const maxPrice = Math.max(...allPrices);
-    const priceRange = maxPrice - minPrice;
-    const avgHistorical = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
-    const changePercent = ((allPrices[allPrices.length - 1] - allPrices[0]) / allPrices[0] * 100);
+    // Use summary from API for statistics
+    const { avg_price, min_price, max_price, change_percent } = historySummary;
+    const priceRange = max_price - min_price;
 
     // Determine volatility rating based on price range
     const getVolatilityRating = () => {
-        const volatilityPercent = (priceRange / avgHistorical) * 100;
+        const volatilityPercent = (priceRange / (avg_price || 1)) * 100;
         if (volatilityPercent < 0.5) return { rating: 'LOW', variant: 'success' };
         if (volatilityPercent < 1.5) return { rating: 'MEDIUM', variant: 'warning' };
         return { rating: 'HIGH', variant: 'danger' };
@@ -106,13 +120,13 @@ function Charts() {
 
                 <Card className="metric-card">
                     <div className="card-title" style={{ marginBottom: '8px' }}>Máximo del Período</div>
-                    <div className="metric-value text-success">{formatCurrency(maxPrice)}</div>
+                    <div className="metric-value text-success">{formatCurrency(max_price)}</div>
                     <div className="metric-label">{TIME_PERIODS.find(p => p.key === selectedPeriod)?.label}</div>
                 </Card>
 
                 <Card className="metric-card">
                     <div className="card-title" style={{ marginBottom: '8px' }}>Mínimo del Período</div>
-                    <div className="metric-value text-danger">{formatCurrency(minPrice)}</div>
+                    <div className="metric-value text-danger">{formatCurrency(min_price)}</div>
                     <div className="metric-label">{TIME_PERIODS.find(p => p.key === selectedPeriod)?.label}</div>
                 </Card>
 
@@ -130,10 +144,16 @@ function Charts() {
             {/* Main Chart - Full Width (US2: gráfico histórico) */}
             <Card
                 title="Evolución del Precio"
-                subtitle={`* Datos simulados para demostración - ${TIME_PERIODS.find(p => p.key === selectedPeriod)?.label}`}
+                subtitle={isLoading ? "Cargando..." : `Datos reales - ${historyData.length} puntos`}
             >
                 <div style={{ minHeight: '400px' }}>
-                    <PriceLineChart data={priceHistoryData} height={400} />
+                    {historyData.length > 0 ? (
+                        <PriceLineChart data={historyData} height={400} />
+                    ) : (
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', color: 'var(--color-text-muted)' }}>
+                            {isLoading ? 'Cargando datos...' : 'Sin datos históricos'}
+                        </div>
+                    )}
                 </div>
             </Card>
 
@@ -144,13 +164,13 @@ function Charts() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)' }}>
                             <span className="text-muted">Cambio en el período</span>
-                            <span className={changePercent >= 0 ? 'text-success' : 'text-danger'}>
-                                {formatPercent(changePercent)}
+                            <span className={change_percent >= 0 ? 'text-success' : 'text-danger'}>
+                                {formatPercent(change_percent)}
                             </span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)' }}>
                             <span className="text-muted">Promedio histórico</span>
-                            <span>{formatCurrency(avgHistorical)}</span>
+                            <span>{formatCurrency(avg_price)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)' }}>
                             <span className="text-muted">Rango de variación</span>
@@ -158,7 +178,7 @@ function Charts() {
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)' }}>
                             <span className="text-muted">Puntos de datos</span>
-                            <span>{priceHistoryData.length}</span>
+                            <span>{historyData.length}</span>
                         </div>
                     </div>
                 </Card>

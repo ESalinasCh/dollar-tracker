@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
-import { PRICE_HISTORY, formatCurrency, formatPercent } from '../data/mockData';
+import { formatCurrency, formatPercent } from '../data/mockData';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -85,19 +85,17 @@ const TIME_PERIODS = [
 function Dashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('24h');
     const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Loading...' });
+    const [historyData, setHistoryData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdate, setLastUpdate] = useState(null);
 
-    const priceHistoryData = PRICE_HISTORY[selectedPeriod] || PRICE_HISTORY['24h'];
-
+    // Fetch current prices
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchCurrentPrices = async () => {
             try {
                 const response = await fetch('http://localhost:8000/api/v1/prices/current');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch data');
-                }
+                if (!response.ok) throw new Error('Failed to fetch data');
                 const data = await response.json();
                 setCurrentData({
                     prices: data.prices,
@@ -105,20 +103,37 @@ function Dashboard() {
                     source: data.source
                 });
                 setLastUpdate(new Date());
-                setIsLoading(false);
                 setError(null);
             } catch (err) {
                 console.error("API Fetch Error:", err);
                 setError(err.message);
+            }
+        };
+
+        fetchCurrentPrices();
+        const interval = setInterval(fetchCurrentPrices, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Fetch historical data based on selected period
+    useEffect(() => {
+        const fetchHistory = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
+                if (!response.ok) throw new Error('Failed to fetch history');
+                const data = await response.json();
+                setHistoryData(data.data || []);
+            } catch (err) {
+                console.error("History Fetch Error:", err);
+                setHistoryData([]);
+            } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchData();
-        // Poll every 30 seconds (US1: auto-refresh)
-        const interval = setInterval(fetchData, 30000);
-        return () => clearInterval(interval);
-    }, []);
+        fetchHistory();
+    }, [selectedPeriod]);
 
     const { prices, average, source } = currentData;
 
@@ -177,7 +192,7 @@ function Dashboard() {
                 {/* Left Column - Chart (US2: Ver gráficos históricos) */}
                 <div>
                     <Card title="Price History"
-                        subtitle="* Simulated data for demonstration"
+                        subtitle={isLoading ? "Loading..." : `Real data from API - ${historyData.length} data points`}
                         action={
                             <div className="nav-tabs">
                                 {TIME_PERIODS.map(period => (
@@ -192,7 +207,13 @@ function Dashboard() {
                             </div>
                         }>
                         <div style={{ minHeight: '300px' }}>
-                            <PriceLineChart data={priceHistoryData} height={300} />
+                            {historyData.length > 0 ? (
+                                <PriceLineChart data={historyData} height={300} />
+                            ) : (
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', color: 'var(--color-text-muted)' }}>
+                                    {isLoading ? 'Loading chart data...' : 'No historical data available'}
+                                </div>
+                            )}
                         </div>
                     </Card>
                 </div>
@@ -217,7 +238,7 @@ function Dashboard() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
                                 <span className="text-muted">Source</span>
-                                <Badge variant="success">Binance P2P</Badge>
+                                <Badge variant="success">{source || 'Multiple'}</Badge>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
                                 <span className="text-muted">Auto-refresh</span>
