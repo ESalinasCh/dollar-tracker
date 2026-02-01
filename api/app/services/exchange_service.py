@@ -31,7 +31,14 @@ class ExchangeService:
         self._cache_time: dict = {}
         self._source_status: dict = {
             "binance": "unknown",
+            "okx": "unknown",
+            "airtm": "unknown",
+            "wallbit": "unknown",
+            "takenos": "unknown",
+            "bcb": "unknown",
         }
+        # DolarBlueBolivia API base URL
+        self._dbb_base_url = "https://api.dolarbluebolivia.click"
     
     async def get_current_prices(self) -> CurrentPricesResponse:
         """Get current exchange rates from available sources."""
@@ -68,7 +75,40 @@ class ExchangeService:
             logger.error(f"Binance error: {e}")
             self._source_status["binance"] = "error"
         
+        # Fetch OKX P2P (Real BOB Rates)
+        try:
+            okx_buy_usdt = await self._fetch_okx_p2p(side="buy")  # User Buys = Ask
+            okx_sell_usdt = await self._fetch_okx_p2p(side="sell") # User Sells = Bid
+            
+            if okx_buy_usdt and okx_sell_usdt:
+                self._source_status["okx"] = "active"
+                sources_active.append("OKX P2P")
+                
+                prices.append(ExchangePrice(
+                    exchange="okx",
+                    name="OKX P2P (USDT)",
+                    bid=round(okx_sell_usdt, 2),
+                    ask=round(okx_buy_usdt, 2),
+                    last=round((okx_buy_usdt + okx_sell_usdt) / 2, 2),
+                    change_24h=0.0,
+                    updated_at=datetime.utcnow(),
+                    volume_24h=None
+                ))
+        except Exception as e:
+            logger.error(f"OKX error: {e}")
+            self._source_status["okx"] = "error"
+        
         # Set source used
+        if sources_active:
+            source_used = " + ".join(sources_active)
+        
+        # Fetch DolarBlueBolivia sources (AirTM, Wallbit, Takenos, BCB)
+        dbb_sources = await self._fetch_dolarblue_sources()
+        for price in dbb_sources:
+            prices.append(price)
+            sources_active.append(price.name)
+        
+        # Update source string
         if sources_active:
             source_used = " + ".join(sources_active)
         
@@ -194,9 +234,139 @@ class ExchangeService:
                 status=self._source_status.get("binance", "unknown"),
                 last_check=datetime.utcnow(),
             ),
+            SourceInfo(
+                id="okx",
+                name="OKX P2P",
+                url="https://www.okx.com/p2p",
+                status=self._source_status.get("okx", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="airtm",
+                name="AirTM",
+                url="https://airtm.com",
+                status=self._source_status.get("airtm", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="wallbit",
+                name="Wallbit",
+                url="https://wallbit.io",
+                status=self._source_status.get("wallbit", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="takenos",
+                name="Takenos",
+                url="https://takenos.com",
+                status=self._source_status.get("takenos", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
+            SourceInfo(
+                id="bcb",
+                name="Banco Central de Bolivia",
+                url="https://www.bcb.gob.bo",
+                status=self._source_status.get("bcb", "unknown"),
+                last_check=datetime.utcnow(),
+            ),
         ]
         
         return SourcesResponse(sources=sources)
+    
+    async def _fetch_dolarblue_sources(self) -> list[ExchangePrice]:
+        """
+        Fetch rates from DolarBlueBolivia API sources.
+        Returns list of ExchangePrice from AirTM, Wallbit, Takenos, and BCB.
+        """
+        prices = []
+        now = datetime.utcnow()
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # AirTM
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/airtm")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("addValue") and data.get("withdrawValue"):
+                        self._source_status["airtm"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="airtm",
+                            name="AirTM",
+                            ask=round(float(data["addValue"]), 2),  # Buy USD
+                            bid=round(float(data["withdrawValue"]), 2),  # Sell USD
+                            last=round((float(data["addValue"]) + float(data["withdrawValue"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"AirTM error: {e}")
+                self._source_status["airtm"] = "error"
+            
+            # Wallbit
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/wallbit")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("buy") and data.get("sell"):
+                        self._source_status["wallbit"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="wallbit",
+                            name="Wallbit",
+                            ask=round(float(data["buy"]), 2),
+                            bid=round(float(data["sell"]), 2),
+                            last=round((float(data["buy"]) + float(data["sell"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"Wallbit error: {e}")
+                self._source_status["wallbit"] = "error"
+            
+            # Takenos
+            try:
+                response = await client.get(f"{self._dbb_base_url}/fetch/takenos")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("buy") and data.get("sell"):
+                        self._source_status["takenos"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="takenos",
+                            name="Takenos",
+                            ask=round(float(data["buy"]), 2),
+                            bid=round(float(data["sell"]), 2),
+                            last=round((float(data["buy"]) + float(data["sell"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"Takenos error: {e}")
+                self._source_status["takenos"] = "error"
+            
+            # BCB (Banco Central de Bolivia) - Official Rate
+            try:
+                response = await client.get(f"{self._dbb_base_url}/v1/bcb")
+                if response.status_code == 200:
+                    data = response.json().get("data", {})
+                    if data.get("compra") and data.get("venta"):
+                        self._source_status["bcb"] = "active"
+                        prices.append(ExchangePrice(
+                            exchange="bcb",
+                            name="BCB (Oficial)",
+                            ask=round(float(data["venta"]), 2),  # Venta = Buy USD
+                            bid=round(float(data["compra"]), 2),  # Compra = Sell USD
+                            last=round((float(data["venta"]) + float(data["compra"])) / 2, 2),
+                            change_24h=0.0,
+                            updated_at=now,
+                            volume_24h=None
+                        ))
+            except Exception as e:
+                logger.debug(f"BCB error: {e}")
+                self._source_status["bcb"] = "error"
+        
+        return prices
     
     # ============================================
     # Private Methods
@@ -243,6 +413,74 @@ class ExchangeService:
                 return sum(valid_ads) / len(valid_ads)
         except Exception as e:
             logger.error(f"Binance P2P {trade_type} error: {e}")
+            return 0.0
+
+    async def _fetch_okx_p2p(self, side: str = "buy") -> float:
+        """
+        Fetch P2P rates from OKX (USDT/BOB).
+        side: "buy" (user buys USDT = Ask) or "sell" (user sells USDT = Bid)
+        """
+        # OKX P2P uses GET with query parameters
+        base_url = "https://www.okx.com/v3/c2c/tradingOrders/books"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        }
+        params = {
+            "quoteCurrency": "BOB",
+            "baseCurrency": "USDT",
+            "side": side,
+            "paymentMethod": "all",
+            "userType": "all",
+            "showTrade": "false",
+            "showFollow": "false",
+            "showAlreadyTraded": "false",
+            "isAbleFilter": "false",
+            "urlId": "1",  # Required parameter
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(base_url, params=params, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                
+                # OKX response: {"code": "0", "data": {"buy": [...], "sell": [...]}}
+                if data.get("code") != "0":
+                    logger.warning(f"OKX API error: {data.get('msg', 'Unknown error')}")
+                    return 0.0
+                
+                ads_data = data.get("data", {})
+                ads = ads_data.get(side, []) if isinstance(ads_data, dict) else []
+                
+                if not ads:
+                    # Try alternate response structure (list)
+                    if isinstance(ads_data, list):
+                        ads = ads_data
+                
+                if not ads:
+                    logger.debug(f"No OKX P2P ads found for {side}")
+                    return 0.0
+                
+                # Get average of top 3 prices to avoid outliers
+                valid_prices = []
+                for ad in ads[:5]:
+                    price = ad.get("price") or ad.get("unitPrice")
+                    if price:
+                        try:
+                            valid_prices.append(float(price))
+                        except (ValueError, TypeError):
+                            continue
+                
+                if not valid_prices:
+                    return 0.0
+                    
+                return sum(valid_prices[:3]) / min(len(valid_prices), 3)
+        except httpx.HTTPStatusError as e:
+            logger.debug(f"OKX P2P {side} HTTP error: {e.response.status_code}")
+            return 0.0
+        except Exception as e:
+            logger.debug(f"OKX P2P {side} error: {e}")
             return 0.0
 
     def _get_mock_prices(self) -> list[ExchangePrice]:
