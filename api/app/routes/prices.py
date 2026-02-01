@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from typing import Optional
 
-from app.services import exchange_service
+from app.dependencies import get_exchange_service
+from app.services import ExchangeService
 from app.models import CurrentPricesResponse, PriceHistoryResponse
 
 router = APIRouter(prefix="/prices", tags=["Prices"])
@@ -13,14 +14,16 @@ router = APIRouter(prefix="/prices", tags=["Prices"])
     summary="Get current exchange rates",
     description="Returns current USD/BOB exchange rates from all available sources.",
 )
-async def get_current_prices():
+async def get_current_prices(
+    service: ExchangeService = Depends(get_exchange_service)
+):
     """
     Get current exchange rates (US1).
     
     Returns the current dollar exchange rate from multiple sources,
     including the average price and best buy/sell recommendations.
     """
-    return await exchange_service.get_current_prices()
+    return await service.get_current_prices()
 
 
 @router.get(
@@ -39,6 +42,7 @@ async def get_price_history(
         default=None,
         description="Filter by specific exchange",
     ),
+    service: ExchangeService = Depends(get_exchange_service),
 ):
     """
     Get historical price data (US2).
@@ -46,4 +50,4 @@ async def get_price_history(
     Returns price history with OHLCV data for the specified interval.
     Users can filter by exchange and select different time ranges.
     """
-    return await exchange_service.get_price_history(interval, exchange)
+    return await service.get_price_history(interval, exchange)

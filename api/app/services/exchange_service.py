@@ -27,6 +27,7 @@ class ExchangeService:
     """Service to fetch exchange rates from external APIs."""
     
     def __init__(self):
+        logger.info(f"Initializing ExchangeService from {__file__} - Instance {id(self)}")
         self._cache: dict = {}
         self._cache_time: dict = {}
         self._source_status: dict = {
@@ -39,14 +40,20 @@ class ExchangeService:
         }
         # DolarBlueBolivia API base URL
         self._dbb_base_url = "https://api.dolarbluebolivia.click"
+        
+        # In-memory cache for partial recovery on API failure
+        self._dbb_prices: dict = {}
     
     async def get_current_prices(self) -> CurrentPricesResponse:
         """Get current exchange rates from available sources."""
+        logger.error(f"CRITICAL DEBUG: get_current_prices called on instance {id(self)}")
         
         # Check cache
         cache_key = "current_prices"
         if self._is_cache_valid(cache_key):
-            return self._cache[cache_key]
+            cached = self._cache[cache_key]
+            logger.error(f"CRITICAL DEBUG: Returning from cache: {len(cached.prices)} prices (instance {id(self)})")
+            return cached
         
         prices = []
         source_used = "unknown"
@@ -277,9 +284,10 @@ class ExchangeService:
         """
         Fetch rates from DolarBlueBolivia API sources.
         Returns list of ExchangePrice from AirTM, Wallbit, Takenos, and BCB.
+        Persists successful responses in self._dbb_prices to mitigate rate limiting/failures.
         """
-        prices = []
         now = datetime.utcnow()
+        fetched_count = 0
         
         async with httpx.AsyncClient(timeout=10.0) as client:
             # AirTM
@@ -289,18 +297,21 @@ class ExchangeService:
                     data = response.json().get("data", {})
                     if data.get("addValue") and data.get("withdrawValue"):
                         self._source_status["airtm"] = "active"
-                        prices.append(ExchangePrice(
+                        self._dbb_prices["airtm"] = ExchangePrice(
                             exchange="airtm",
                             name="AirTM",
-                            ask=round(float(data["addValue"]), 2),  # Buy USD
-                            bid=round(float(data["withdrawValue"]), 2),  # Sell USD
+                            ask=round(float(data["addValue"]), 2),
+                            bid=round(float(data["withdrawValue"]), 2),
                             last=round((float(data["addValue"]) + float(data["withdrawValue"])) / 2, 2),
                             change_24h=0.0,
                             updated_at=now,
                             volume_24h=None
-                        ))
+                        )
+                        fetched_count += 1
+                else:
+                    logger.warning(f"AirTM returned status {response.status_code}")
             except Exception as e:
-                logger.debug(f"AirTM error: {e}")
+                logger.error(f"AirTM error: {e}")
                 self._source_status["airtm"] = "error"
             
             # Wallbit
@@ -310,7 +321,7 @@ class ExchangeService:
                     data = response.json().get("data", {})
                     if data.get("buy") and data.get("sell"):
                         self._source_status["wallbit"] = "active"
-                        prices.append(ExchangePrice(
+                        self._dbb_prices["wallbit"] = ExchangePrice(
                             exchange="wallbit",
                             name="Wallbit",
                             ask=round(float(data["buy"]), 2),
@@ -319,9 +330,12 @@ class ExchangeService:
                             change_24h=0.0,
                             updated_at=now,
                             volume_24h=None
-                        ))
+                        )
+                        fetched_count += 1
+                else:
+                    logger.warning(f"Wallbit returned status {response.status_code}")
             except Exception as e:
-                logger.debug(f"Wallbit error: {e}")
+                logger.error(f"Wallbit error: {e}")
                 self._source_status["wallbit"] = "error"
             
             # Takenos
@@ -331,7 +345,7 @@ class ExchangeService:
                     data = response.json().get("data", {})
                     if data.get("buy") and data.get("sell"):
                         self._source_status["takenos"] = "active"
-                        prices.append(ExchangePrice(
+                        self._dbb_prices["takenos"] = ExchangePrice(
                             exchange="takenos",
                             name="Takenos",
                             ask=round(float(data["buy"]), 2),
@@ -340,9 +354,12 @@ class ExchangeService:
                             change_24h=0.0,
                             updated_at=now,
                             volume_24h=None
-                        ))
+                        )
+                        fetched_count += 1
+                else:
+                    logger.warning(f"Takenos returned status {response.status_code}")
             except Exception as e:
-                logger.debug(f"Takenos error: {e}")
+                logger.error(f"Takenos error: {e}")
                 self._source_status["takenos"] = "error"
             
             # BCB (Banco Central de Bolivia) - Official Rate
@@ -352,21 +369,29 @@ class ExchangeService:
                     data = response.json().get("data", {})
                     if data.get("compra") and data.get("venta"):
                         self._source_status["bcb"] = "active"
-                        prices.append(ExchangePrice(
+                        self._dbb_prices["bcb"] = ExchangePrice(
                             exchange="bcb",
                             name="BCB (Oficial)",
-                            ask=round(float(data["venta"]), 2),  # Venta = Buy USD
-                            bid=round(float(data["compra"]), 2),  # Compra = Sell USD
+                            ask=round(float(data["venta"]), 2),
+                            bid=round(float(data["compra"]), 2),
                             last=round((float(data["venta"]) + float(data["compra"])) / 2, 2),
                             change_24h=0.0,
                             updated_at=now,
                             volume_24h=None
-                        ))
+                        )
+                        fetched_count += 1
+                else:
+                    logger.warning(f"BCB returned status {response.status_code}")
             except Exception as e:
-                logger.debug(f"BCB error: {e}")
+                logger.error(f"BCB error: {e}")
                 self._source_status["bcb"] = "error"
         
-        return prices
+        # Log success/failure count
+        if fetched_count < 4:
+            logger.info(f"Fetched {fetched_count}/4 DolarBlue sources. Using cached values for {4-fetched_count} sources.")
+        
+        # Return all available prices from cache (including just updated ones)
+        return list(self._dbb_prices.values())
     
     # ============================================
     # Private Methods
@@ -560,5 +585,4 @@ class ExchangeService:
         self._cache_time[key] = datetime.utcnow()
 
 
-# Singleton instance
-exchange_service = ExchangeService()
+

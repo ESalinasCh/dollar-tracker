@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Cache
     cache_ttl: int = 60  # seconds
     
+    # Database
+    mongo_url: str = "mongodb://localhost:27017"
+    mongo_db_name: str = "dollar_tracker"
+    
     # External APIs
     # External APIs
     dolar_api_url: str = "https://bo.dolarapi.com/v1"

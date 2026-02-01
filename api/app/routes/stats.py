@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
-from app.services import exchange_service
+from app.dependencies import get_exchange_service
+from app.services import ExchangeService
 from app.models import VolatilityResponse, SourcesResponse
 
 router = APIRouter(prefix="/stats", tags=["Statistics"])
@@ -18,6 +19,7 @@ async def get_volatility(
         description="Period for volatility calculation",
         enum=["1h", "24h", "7d", "30d"],
     ),
+    service: ExchangeService = Depends(get_exchange_service),
 ):
     """
     Get volatility metrics.
@@ -25,7 +27,7 @@ async def get_volatility(
     Calculates and returns volatility statistics including
     standard deviation and a qualitative rating (low/medium/high).
     """
-    return await exchange_service.get_volatility(period)
+    return await service.get_volatility(period)
 
 
 @router.get(
@@ -34,11 +36,13 @@ async def get_volatility(
     summary="Get data sources",
     description="Returns information about available data sources (US6).",
 )
-async def get_sources():
+async def get_sources(
+    service: ExchangeService = Depends(get_exchange_service),
+):
     """
     Get information about data sources (US6).
     
     Returns a list of all configured data sources with their
     current status and last check time.
     """
-    return await exchange_service.get_sources()
+    return await service.get_sources()

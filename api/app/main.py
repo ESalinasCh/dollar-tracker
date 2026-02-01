@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import asyncio
+import time
 
 from app.config import get_settings
 from app.routes import prices_router, stats_router, health_router
 from app.database import Database, price_history_service
-from app.services.exchange_service import exchange_service
+from app.services import ExchangeService
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Background task for storing prices
-async def store_prices_background():
+async def store_prices_background(exchange_service: ExchangeService):
     """Background task to store prices every hour for 24h change calculation."""
     while True:
         try:
@@ -56,13 +57,18 @@ async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.api_title} v{settings.api_version}")
     logger.info(f"CORS origins: {settings.cors_origins_list}")
     
+    # Initialize Exchange Service Singleton
+    service = ExchangeService()
+    app.state.exchange_service = service
+    logger.info("Initialized ExchangeService singleton in app.state")
+    
     # Connect to MongoDB
     await Database.connect()
     
     # Start background task for price storage (only if MongoDB connected)
     task = None
     if Database.is_connected():
-        task = asyncio.create_task(store_prices_background())
+        task = asyncio.create_task(store_prices_background(service))
         logger.info("Started background price storage task")
     else:
         logger.warning("MongoDB not connected - price history disabled")

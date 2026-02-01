@@ -1,3 +1,3 @@
-from app.services.exchange_service import exchange_service, ExchangeService
+from app.services.exchange_service import ExchangeService
 
-__all__ = ["exchange_service", "ExchangeService"]
+__all__ = ["ExchangeService"]

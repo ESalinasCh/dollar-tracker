@@ -41,7 +41,11 @@ function MetricCard({ title, value, subtitle, showChange = true, change = 0 }) {
 // Exchange Item Component
 function ExchangeItem({ exchange }) {
     const colors = {
-        binance: '#f3ba2f'
+        binance: '#f3ba2f',
+        airtm: '#28459a',   // AirTM Blue
+        wallbit: '#18181b', // Wallbit Black
+        takenos: '#22c55e', // Takenos Green
+        bcb: '#1e3a8a',     // BCB Dark Blue
     };
 
     return (
@@ -80,7 +84,7 @@ const TIME_PERIODS = [
 
 function Dashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('24h');
-    const [currentData, setCurrentData] = useState({ prices: [], average: 0 });
+    const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Loading...' });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdate, setLastUpdate] = useState(null);
@@ -90,14 +94,15 @@ function Dashboard() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/v1/prices/current');
+                const response = await fetch('http://localhost:8000/api/v1/prices/current');
                 if (!response.ok) {
                     throw new Error('Failed to fetch data');
                 }
                 const data = await response.json();
                 setCurrentData({
                     prices: data.prices,
-                    average: data.average
+                    average: data.average,
+                    source: data.source
                 });
                 setLastUpdate(new Date());
                 setIsLoading(false);
@@ -115,7 +120,7 @@ function Dashboard() {
         return () => clearInterval(interval);
     }, []);
 
-    const { prices, average } = currentData;
+    const { prices, average, source } = currentData;
 
     // Get the first (and only) exchange price for Bid/Ask display
     const primaryExchange = prices[0] || {};
@@ -151,7 +156,7 @@ function Dashboard() {
                     title="Current USD/BOB Price"
                     value={formatCurrency(average)}
                     showChange={false}
-                    subtitle="Binance P2P Average"
+                    subtitle={source || "Average"}
                 />
                 <MetricCard
                     title="Best Bid (Sell USDT)"
@@ -195,7 +200,7 @@ function Dashboard() {
                 {/* Right Column - Exchange Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
                     {/* Exchange Prices */}
-                    <Card title="Exchange Prices" subtitle="Live data from Binance P2P">
+                    <Card title="Exchange Prices" subtitle={`Live data from ${source || 'Multipie Sources'}`}>
                         <div className="exchange-list">
                             {prices.map((exchange) => (
                                 <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />

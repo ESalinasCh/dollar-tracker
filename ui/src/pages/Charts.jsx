@@ -15,21 +15,22 @@ const TIME_PERIODS = [
 
 function Charts() {
     const [selectedPeriod, setSelectedPeriod] = useState('7d');
-    const [currentData, setCurrentData] = useState({ prices: [], average: 0 });
+    const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Calculando...' });
     const [isLoading, setIsLoading] = useState(true);
 
     // Fetch real-time data from API
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/v1/prices/current');
+                const response = await fetch('http://localhost:8000/api/v1/prices/current');
                 if (response.ok) {
                     const data = await response.json();
                     setCurrentData({
                         prices: data.prices,
                         average: data.average,
                         bestBuy: data.best_buy,
-                        bestSell: data.best_sell
+                        bestSell: data.best_sell,
+                        source: data.source
                     });
                 }
                 setIsLoading(false);
@@ -163,7 +164,7 @@ function Charts() {
                 </Card>
 
                 {/* Current Market Details (US6: mostrar origen) */}
-                <Card title="Detalles del Mercado" subtitle="Datos en tiempo real de Binance P2P">
+                <Card title="Detalles del Mercado" subtitle={`Datos en tiempo real de ${currentData.source || 'Múltiples Fuentes'}`}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                         <div style={{
                             padding: '16px',
