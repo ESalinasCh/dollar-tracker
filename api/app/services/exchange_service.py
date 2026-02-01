@@ -161,33 +161,73 @@ class ExchangeService:
         interval: str = "7d",
         exchange: Optional[str] = None
     ) -> PriceHistoryResponse:
-        """Get historical price data."""
+        """
+        Get historical price data (US2).
+        Fetches real data from MongoDB via PriceHistoryService.
+        """
         
-        # Parse interval
-        intervals = {
-            "1h": 1/24,
-            "24h": 1,
-            "7d": 7,
-            "30d": 30,
-            "1y": 365,
+        # Parse interval to hours
+        intervals_hours = {
+            "1h": 1,
+            "24h": 24,
+            "7d": 7 * 24,
+            "30d": 30 * 24,
+            "1y": 365 * 24,
         }
-        days = intervals.get(interval, 7)
+        hours = intervals_hours.get(interval, 24)
         
-        # Generate data points (in production, fetch from DB or external API)
-        data_points = self._generate_price_history(days)
+        # 1. Try to get REAL data from MongoDB
+        from app.database import price_history_service
+        logger.info(f"Fetching history from MongoDB for interval {interval} (hours={hours})")
+        raw_history = await price_history_service.get_history(exchange, hours)
         
+        data_points = []
+        if raw_history:
+            # Convert DB documents to PriceDataPoint
+            # Since we store 1 point per hour, we use 'last' price for OHLC
+            for doc in raw_history:
+                price = doc.get("last", 0.0)
+                data_points.append(PriceDataPoint(
+                    timestamp=doc.get("timestamp"),
+                    open=price,
+                    high=price,
+                    low=price,
+                    close=price,
+                    volume=0 # We don't track volume yet
+                ))
+        
+        # 2. Fallback: If no real data exists (e.g. system just started), 
+        # return empty list or simulated data? 
+        # User requested "no nos sirve los datos generados". 
+        # However, returning empty list will show "No historical data available".
+        # We will return what we found.
+        
+        if not data_points:
+             # NOTE: For now, we return empty list if no data. 
+             # Use the background task to populate data over time.
+             pass
+
         # Calculate summary
-        closes = [dp.close for dp in data_points]
-        summary = PriceHistorySummary(
-            avg_price=round(sum(closes) / len(closes), 4),
-            min_price=round(min(closes), 4),
-            max_price=round(max(closes), 4),
-            total_volume=sum(dp.volume or 0 for dp in data_points),
-            change_percent=round(
-                ((closes[-1] - closes[0]) / closes[0]) * 100 if closes[0] else 0, 
-                2
-            ),
-        )
+        if data_points:
+            closes = [dp.close for dp in data_points]
+            summary = PriceHistorySummary(
+                avg_price=round(sum(closes) / len(closes), 4),
+                min_price=round(min(closes), 4),
+                max_price=round(max(closes), 4),
+                total_volume=0,
+                change_percent=round(
+                    ((closes[-1] - closes[0]) / closes[0]) * 100 if closes[0] else 0, 
+                    2
+                ),
+            )
+        else:
+             summary = PriceHistorySummary(
+                avg_price=0.0,
+                min_price=0.0,
+                max_price=0.0,
+                total_volume=0,
+                change_percent=0.0
+            )
         
         return PriceHistoryResponse(
             exchange=exchange or "all",
