@@ -3,9 +3,9 @@
 
 // Helper function to format currency
 export function formatCurrency(value, decimals = 2) {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('es-BO', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'BOB',
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   }).format(value);

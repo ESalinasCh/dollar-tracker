@@ -52,7 +52,7 @@ function Charts() {
                 const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
                 if (response.ok) {
                     const data = await response.json();
-                    setHistoryData(data.data || []);
+                    setHistoryData(data.data_points || []);
                     setHistorySummary(data.summary || { avg_price: 0, min_price: 0, max_price: 0, change_percent: 0 });
                 }
             } catch (err) {
@@ -82,7 +82,7 @@ function Charts() {
     const primaryExchange = currentData.prices[0] || {};
 
     if (isLoading) {
-        return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
+        return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cargando...</div>;
     }
 
     return (

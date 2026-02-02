@@ -49,7 +49,7 @@ CustomTooltip.propTypes = {
 function PriceLineChart({ data, height = 300, showGrid = true }) {
     // Transform data for the chart
     const chartData = data.map((point, index) => ({
-        name: new Date(point.timestamp).toLocaleTimeString('en-US', {
+        name: new Date(point.timestamp).toLocaleTimeString('es-BO', {
             hour: '2-digit',
             minute: '2-digit'
         }),

@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import logo from '../../assets/logo.png';
 
 // Simple icon components
 const icons = {
@@ -28,7 +29,7 @@ const icons = {
 function Sidebar({ currentPage, onNavigate, isOpen, onClose }) {
     // Navigation items - US1-6 scope only
     const navItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+        { id: 'dashboard', label: 'Inicio', icon: 'dashboard' },
         { id: 'charts', label: 'Gráficos', icon: 'charts' },
     ];
 
@@ -37,7 +38,7 @@ function Sidebar({ currentPage, onNavigate, isOpen, onClose }) {
             {/* Mobile overlay */}
             {isOpen && (
                 <div
-                    className="fixed inset-0 bg-black/50 z-40 hide-desktop"
+                    className="sidebar-overlay hide-desktop"
                     onClick={onClose}
                 />
             )}
@@ -46,9 +47,7 @@ function Sidebar({ currentPage, onNavigate, isOpen, onClose }) {
                 {/* Logo */}
                 <div className="sidebar-header">
                     <div className="sidebar-logo">
-                        <div className="sidebar-logo-icon">
-                            {icons.dollar}
-                        </div>
+                        <img src={logo} alt="Dollar Tracker Logo" style={{ width: '40px', height: '40px', borderRadius: '8px' }} />
                         <div className="sidebar-logo-text">
                             Dollar<span>Tracker</span>
                         </div>
@@ -58,7 +57,6 @@ function Sidebar({ currentPage, onNavigate, isOpen, onClose }) {
                 {/* Navigation */}
                 <nav className="sidebar-nav">
                     <div className="nav-section">
-                        <div className="nav-section-title">MENU</div>
                         <ul className="nav-list">
                             {navItems.map((item) => (
                                 <li key={item.id}>

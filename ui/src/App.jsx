@@ -15,11 +15,11 @@ function App() {
   const getPageTitle = () => {
     switch (currentPage) {
       case 'dashboard':
-        return 'Dashboard';
+        return 'Inicio';
       case 'charts':
         return 'Gráficos';
       default:
-        return 'Dashboard';
+        return 'Inicio';
     }
   };
 

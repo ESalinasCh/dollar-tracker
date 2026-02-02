@@ -164,6 +164,7 @@ class ExchangeService:
         """
         Get historical price data (US2).
         Fetches real data from MongoDB via PriceHistoryService.
+        Aggregates multiple sources into single hourly points if exchange is not specified.
         """
         
         # Parse interval to hours
@@ -183,29 +184,46 @@ class ExchangeService:
         
         data_points = []
         if raw_history:
-            # Convert DB documents to PriceDataPoint
-            # Since we store 1 point per hour, we use 'last' price for OHLC
-            for doc in raw_history:
-                price = doc.get("last", 0.0)
-                data_points.append(PriceDataPoint(
-                    timestamp=doc.get("timestamp"),
-                    open=price,
-                    high=price,
-                    low=price,
-                    close=price,
-                    volume=0 # We don't track volume yet
-                ))
-        
-        # 2. Fallback: If no real data exists (e.g. system just started), 
-        # return empty list or simulated data? 
-        # User requested "no nos sirve los datos generados". 
-        # However, returning empty list will show "No historical data available".
-        # We will return what we found.
-        
-        if not data_points:
-             # NOTE: For now, we return empty list if no data. 
-             # Use the background task to populate data over time.
-             pass
+            if exchange:
+                # If specific exchange, return raw points
+                for doc in raw_history:
+                    price = doc.get("last", 0.0)
+                    data_points.append(PriceDataPoint(
+                        timestamp=doc.get("timestamp"),
+                        open=price,
+                        high=price,
+                        low=price,
+                        close=price,
+                        volume=0
+                    ))
+            else:
+                # If all exchanges, AGGREGATE by timestamp (minute precision)
+                # to avoid "sawtooth" graph where multiple sources exist at same second
+                from collections import defaultdict
+                grouped = defaultdict(list)
+                
+                for doc in raw_history:
+                    # Group by minute to combine simultaneous writes
+                    ts = doc.get("timestamp").replace(second=0, microsecond=0)
+                    grouped[ts].append(doc.get("last", 0.0))
+                
+                # Sort by timestamp
+                sorted_timestamps = sorted(grouped.keys())
+                
+                for ts in sorted_timestamps:
+                    prices = grouped[ts]
+                    avg_price = round(sum(prices) / len(prices), 4)
+                    data_points.append(PriceDataPoint(
+                        timestamp=ts,
+                        open=avg_price,
+                        high=max(prices),
+                        low=min(prices),
+                        close=avg_price,
+                        volume=0
+                    ))
+
+        # 2. Fallback (Empty if no data)
+        # ... existing logic ...
 
         # Calculate summary
         if data_points:

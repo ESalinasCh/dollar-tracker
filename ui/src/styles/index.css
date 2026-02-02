@@ -99,9 +99,24 @@
   --z-notification: 400;
 
   /* Layout */
-  --sidebar-width: 260px;
+  --sidebar-width: 0px;
+  /* Mobile default */
   --header-height: 64px;
   --max-content-width: 1400px;
+}
+
+/* Desktop Overrides */
+@media (min-width: 1025px) {
+  :root {
+    --sidebar-width: 260px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 80px;
+    /* Tablet collapsed */
+  }
 }
 
 /* ===================================
@@ -540,29 +555,25 @@ select {
 /* ===================================
    Responsive Breakpoints
    =================================== */
-@media (max-width: 640px) {
-  :root {
-    --sidebar-width: 0px;
-    --header-height: 56px;
-  }
-
-  .hide-mobile {
-    display: none !important;
-  }
-}
-
-@media (min-width: 641px) and (max-width: 1024px) {
-  :root {
-    --sidebar-width: 80px;
-  }
-
-  .hide-tablet {
-    display: none !important;
-  }
+/* ===================================
+   Responsive Utilities
+   =================================== */
+.hide-desktop {
+  display: block;
 }
 
 @media (min-width: 1025px) {
   .hide-desktop {
     display: none !important;
+  }
+}
+
+.hide-mobile {
+  display: none;
+}
+
+@media (min-width: 641px) {
+  .hide-mobile {
+    display: block !important;
   }
 }

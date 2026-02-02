@@ -26,7 +26,7 @@ function Header({ title, onMenuClick }) {
                 <div>
                     <h1 className="header-title">{title}</h1>
                     <div className="header-breadcrumb hide-mobile">
-                        <span>Home</span>
+                        <span>Inicio</span>
                         <span>/</span>
                         <span className="text-primary">{title}</span>
                     </div>

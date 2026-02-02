@@ -84,7 +84,7 @@ const TIME_PERIODS = [
 
 function Dashboard() {
     const [selectedPeriod, setSelectedPeriod] = useState('24h');
-    const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Loading...' });
+    const [currentData, setCurrentData] = useState({ prices: [], average: 0, source: 'Cargando...' });
     const [historyData, setHistoryData] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -120,10 +120,14 @@ function Dashboard() {
         const fetchHistory = async () => {
             setIsLoading(true);
             try {
+                console.log('[Dashboard] Fetching history for:', selectedPeriod);
                 const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
+                console.log('[Dashboard] Response status:', response.status);
                 if (!response.ok) throw new Error('Failed to fetch history');
-                const data = await response.json();
-                setHistoryData(data.data || []);
+                const result = await response.json();
+                console.log('[Dashboard] API result:', result);
+                console.log('[Dashboard] Data array:', result.data_points);
+                setHistoryData(result.data_points || []);
             } catch (err) {
                 console.error("History Fetch Error:", err);
                 setHistoryData([]);
@@ -144,7 +148,7 @@ function Dashboard() {
         : '0.00';
 
     if (isLoading && prices.length === 0) {
-        return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading...</div>;
+        return <div className="main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Cargando...</div>;
     }
 
     return (
@@ -152,13 +156,13 @@ function Dashboard() {
             {/* Page Header */}
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">Dashboard</h1>
+                    <h1 className="page-title">Inicio</h1>
                     <p className="page-subtitle">
-                        Real-time dollar price tracking
-                        {error && <span style={{ color: 'var(--color-danger)', marginLeft: '10px' }}>(Offline Mode)</span>}
+                        Seguimiento del precio del dólar en tiempo real
+                        {error && <span style={{ color: 'var(--color-danger)', marginLeft: '10px' }}>(Modo Sin Conexión)</span>}
                         {lastUpdate && !error && (
                             <span style={{ marginLeft: '10px', opacity: 0.7 }}>
-                                Last update: {lastUpdate.toLocaleTimeString()}
+                                Última actualización: {lastUpdate.toLocaleTimeString()}
                             </span>
                         )}
                     </p>
@@ -168,22 +172,22 @@ function Dashboard() {
             {/* Metrics Grid - US1: Ver valor del dólar paralelo */}
             <div className="metrics-grid">
                 <MetricCard
-                    title="Current USD/BOB Price"
+                    title="Precio Actual USD/BOB"
                     value={formatCurrency(average)}
                     showChange={false}
-                    subtitle={source || "Average"}
+                    subtitle={source || "Promedio"}
                 />
                 <MetricCard
-                    title="Best Bid (Sell USDT)"
+                    title="Mejor Compra (Vender USDT)"
                     value={formatCurrency(primaryExchange.bid || 0)}
                     showChange={false}
-                    subtitle="Price to sell your USDT"
+                    subtitle="Precio para vender tus USDT"
                 />
                 <MetricCard
-                    title="Best Ask (Buy USDT)"
+                    title="Mejor Venta (Comprar USDT)"
                     value={formatCurrency(primaryExchange.ask || 0)}
                     showChange={false}
-                    subtitle="Price to buy USDT"
+                    subtitle="Precio para comprar USDT"
                 />
             </div>
 
@@ -191,8 +195,8 @@ function Dashboard() {
             <div className="dashboard-grid">
                 {/* Left Column - Chart (US2: Ver gráficos históricos) */}
                 <div>
-                    <Card title="Price History"
-                        subtitle={isLoading ? "Loading..." : `Real data from API - ${historyData.length} data points`}
+                    <Card title="Historial de Precios"
+                        subtitle={isLoading ? "Cargando..." : `Datos reales de API - ${historyData.length} puntos`}
                         action={
                             <div className="nav-tabs">
                                 {TIME_PERIODS.map(period => (
@@ -211,7 +215,7 @@ function Dashboard() {
                                 <PriceLineChart data={historyData} height={300} />
                             ) : (
                                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', color: 'var(--color-text-muted)' }}>
-                                    {isLoading ? 'Loading chart data...' : 'No historical data available'}
+                                    {isLoading ? 'Cargando datos...' : 'No hay datos históricos disponibles'}
                                 </div>
                             )}
                         </div>
@@ -221,7 +225,7 @@ function Dashboard() {
                 {/* Right Column - Exchange Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
                     {/* Exchange Prices */}
-                    <Card title="Exchange Prices" subtitle={`Live data from ${source || 'Multipie Sources'}`}>
+                    <Card title="Precios por Exchange" subtitle={`Datos en vivo de ${source || 'Fuentes Múltiples'}`}>
                         <div className="exchange-list">
                             {prices.map((exchange) => (
                                 <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
@@ -230,19 +234,19 @@ function Dashboard() {
                     </Card>
 
                     {/* Price Details */}
-                    <Card title="Price Details">
+                    <Card title="Detalles de Precios">
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
                                 <span className="text-muted">Spread</span>
                                 <span className="text-primary">{spread} BOB</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
-                                <span className="text-muted">Source</span>
-                                <Badge variant="success">{source || 'Multiple'}</Badge>
+                                <span className="text-muted">Fuente</span>
+                                <Badge variant="success">{source || 'Múltiple'}</Badge>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
-                                <span className="text-muted">Auto-refresh</span>
-                                <span>Every 30s</span>
+                                <span className="text-muted">Actualización automática</span>
+                                <span>Cada 30s</span>
                             </div>
                         </div>
                     </Card>
