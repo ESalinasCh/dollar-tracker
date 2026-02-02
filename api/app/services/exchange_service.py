@@ -124,9 +124,16 @@ class ExchangeService:
             prices = self._get_mock_prices()
             source_used = "Mock Data"
         
-        # Calculate average and best prices
+        # Calculate average and best prices (Excluding BCB from average)
         if prices:
-            avg_price = sum(p.last for p in prices) / len(prices)
+            # Filter out BCB for parallel average
+            parallel_prices = [p for p in prices if p.exchange.lower() != 'bcb']
+            
+            if parallel_prices:
+                avg_price = sum(p.last for p in parallel_prices) / len(parallel_prices)
+            else:
+                avg_price = sum(p.last for p in prices) / len(prices) # Fallback if only BCB exists
+                
             best_buy = min(prices, key=lambda p: p.bid)
             best_sell = max(prices, key=lambda p: p.ask)
         else:
@@ -203,6 +210,10 @@ class ExchangeService:
                 grouped = defaultdict(list)
                 
                 for doc in raw_history:
+                    # Skip BCB in general average aggregation
+                    if doc.get("exchange", "").lower() == "bcb":
+                        continue
+                        
                     # Group by minute to combine simultaneous writes
                     ts = doc.get("timestamp").replace(second=0, microsecond=0)
                     grouped[ts].append(doc.get("last", 0.0))
@@ -221,6 +232,29 @@ class ExchangeService:
                         close=avg_price,
                         volume=0
                     ))
+
+            # IF General View (no specific exchange), Fetch BCB Reference Data separately
+            if not exchange:
+                try:
+                    # Fetch BCB specific history
+                    bcb_history = await price_history_service.get_history("bcb", hours)
+                    
+                    # Create lookup map for BCB prices by timestamp (minute precision)
+                    bcb_map = {}
+                    if bcb_history:
+                        for doc in bcb_history:
+                            ts = doc.get("timestamp").replace(second=0, microsecond=0)
+                            # If multiple BCB/min (unlikely), take last
+                            bcb_map[ts] = doc.get("last", 0.0)
+                    
+                    # Merge into data_points
+                    for dp in data_points:
+                        # Find closest BCB point (exact match preferred)
+                        if dp.timestamp in bcb_map:
+                            dp.reference_close = bcb_map[dp.timestamp]
+                            
+                except Exception as e:
+                    logger.error(f"Error fetching BCB reference history: {e}")
 
         # 2. Fallback (Empty if no data)
         # ... existing logic ...

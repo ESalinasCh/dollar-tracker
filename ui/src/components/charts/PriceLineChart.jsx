@@ -1,6 +1,7 @@
 import React from 'react';
 import {
-    AreaChart,
+    ComposedChart,
+    Line,
     Area,
     XAxis,
     YAxis,
@@ -17,19 +18,22 @@ function CustomTooltip({ active, payload, label }) {
             <div className="glass" style={{
                 padding: 'var(--spacing-md)',
                 borderRadius: 'var(--radius-md)',
-                minWidth: '150px'
+                minWidth: '180px'
             }}>
-                <p className="text-sm text-secondary" style={{ marginBottom: '4px' }}>
+                <p className="text-sm text-secondary" style={{ marginBottom: '8px', borderBottom: '1px solid var(--color-border)', paddingBottom: '4px' }}>
                     {label}
                 </p>
-                <p className="text-lg font-semibold text-primary">
-                    ${payload[0].value.toFixed(4)}
-                </p>
-                {payload[0].payload.volume && (
-                    <p className="text-xs text-muted">
-                        Vol: ${(payload[0].payload.volume / 1000).toFixed(1)}K
-                    </p>
-                )}
+                {payload.map((entry, index) => (
+                    <div key={index} style={{ marginBottom: '4px' }}>
+                        <span style={{ color: entry.color, fontSize: '0.8rem', marginRight: '6px' }}>●</span>
+                        <span className="text-sm text-muted" style={{ marginRight: '8px' }}>
+                            {entry.name === 'price' ? 'Paralelo' : entry.name}:
+                        </span>
+                        <span className="font-semibold" style={{ color: '#fff' }}>
+                            ${entry.value.toFixed(2)}
+                        </span>
+                    </div>
+                ))}
             </div>
         );
     }
@@ -54,14 +58,19 @@ function PriceLineChart({ data, height = 300, showGrid = true }) {
             minute: '2-digit'
         }),
         price: point.close,
+        bcb_price: point.reference_close || null,
         volume: point.volume,
         index
     }));
 
-    // Calculate min/max for Y axis domain
+    // Calculate min/max for Y axis domain (considering both lines)
     const prices = data.map(d => d.close);
-    const minPrice = Math.min(...prices) * 0.999;
-    const maxPrice = Math.max(...prices) * 1.001;
+    const bcbPrices = data.map(d => d.reference_close).filter(p => p !== null && p !== undefined);
+    const allPrices = [...prices, ...bcbPrices];
+
+    // Fallback if no data
+    const minPrice = allPrices.length ? Math.min(...allPrices) * 0.999 : 0;
+    const maxPrice = allPrices.length ? Math.max(...allPrices) * 1.001 : 10;
 
     return (
         <ResponsiveContainer width="100%" height={height}>
@@ -105,14 +114,29 @@ function PriceLineChart({ data, height = 300, showGrid = true }) {
 
                 <Tooltip content={<CustomTooltip />} />
 
+                {/* Main Price Area (Blue) */}
                 <Area
                     type="monotone"
                     dataKey="price"
+                    name="Promedio Paralelo"
                     stroke="#3b82f6"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#priceGradient)"
                     animationDuration={1000}
+                />
+
+                {/* BCB Reference Line (Red) */}
+                <Area
+                    type="monotone"
+                    dataKey="bcb_price"
+                    name="BCB (Oficial)"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    fill="none" // No fill for reference line
+                    animationDuration={1000}
+                    connectNulls={true}
                 />
             </AreaChart>
         </ResponsiveContainer>

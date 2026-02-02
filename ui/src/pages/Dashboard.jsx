@@ -141,8 +141,12 @@ function Dashboard() {
 
     const { prices, average, source } = currentData;
 
-    // Get the first (and only) exchange price for Bid/Ask display
-    const primaryExchange = prices[0] || {};
+    // Filter prices: Parallel (Binance, AirTM, etc.) vs Official (BCB)
+    const parallelPrices = prices.filter(p => !p.exchange.toLowerCase().includes('bcb'));
+    const officialPrices = prices.filter(p => p.exchange.toLowerCase().includes('bcb'));
+
+    // Get the first (and only) exchange price for Bid/Ask display (Primary Parallel Source)
+    const primaryExchange = parallelPrices[0] || {};
     const spread = primaryExchange.bid && primaryExchange.ask
         ? Math.abs(primaryExchange.bid - primaryExchange.ask).toFixed(2)
         : '0.00';
@@ -175,7 +179,7 @@ function Dashboard() {
                     title="Precio Actual USD/BOB"
                     value={formatCurrency(average)}
                     showChange={false}
-                    subtitle={source || "Promedio"}
+                    subtitle={source || "Promedio Paralelo"}
                 />
                 <MetricCard
                     title="Mejor Compra (Vender USDT)"
@@ -224,14 +228,26 @@ function Dashboard() {
 
                 {/* Right Column - Exchange Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' }}>
-                    {/* Exchange Prices */}
+
+                    {/* Dólar Paralelo Grid */}
                     <Card title="Precios por Exchange" subtitle={`Datos en vivo de ${source || 'Fuentes Múltiples'}`}>
                         <div className="exchange-list">
-                            {prices.map((exchange) => (
+                            {parallelPrices.map((exchange) => (
                                 <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
                             ))}
                         </div>
                     </Card>
+
+                    {/* Tipo de Cambio Referencial (BCB) */}
+                    {officialPrices.length > 0 && (
+                        <Card title="Tipo de Cambio Referencial" subtitle="Banco Central de Bolivia">
+                            <div className="exchange-list">
+                                {officialPrices.map((exchange) => (
+                                    <ExchangeItem key={exchange.exchange + exchange.name} exchange={exchange} />
+                                ))}
+                            </div>
+                        </Card>
+                    )}
 
                     {/* Price Details */}
                     <Card title="Detalles de Precios">

@@ -49,6 +49,7 @@ class PriceDataPoint(BaseModel):
     low: float
     close: float
     volume: Optional[float] = None
+    reference_close: Optional[float] = Field(default=None, description="Reference price (e.g., Official BCB) for comparison")
 
 
 class PriceHistorySummary(BaseModel):
