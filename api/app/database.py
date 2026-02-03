@@ -5,13 +5,17 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from datetime import datetime, timedelta
 from typing import Optional, List
 import logging
-import os
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# MongoDB connection string - defaults to local, can be overridden with env var
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("MONGO_DB_NAME", "dollar_tracker")
+# Get settings (reads from .env file via pydantic_settings)
+settings = get_settings()
+MONGO_URL = settings.mongo_url
+DB_NAME = settings.mongo_db_name
+
+logger.info(f"Database config loaded - URL: {MONGO_URL[:30]}..., DB: {DB_NAME}")
 
 
 class Database:
@@ -26,12 +30,19 @@ class Database:
         try:
             cls.client = AsyncIOMotorClient(MONGO_URL)
             cls.db = cls.client[DB_NAME]
-            
+
+            # Verify connection is actually working (ping the server)
+            await cls.client.admin.command('ping')
+            logger.info(f"MongoDB ping successful!")
+
             # Create indexes for price_history collection
             await cls.db.price_history.create_index([("timestamp", -1)])
             await cls.db.price_history.create_index([("exchange", 1), ("timestamp", -1)])
-            
+
+            # Count existing documents
+            count = await cls.db.price_history.count_documents({})
             logger.info(f"Connected to MongoDB at {MONGO_URL}")
+            logger.info(f"Database: {DB_NAME}, Collection price_history has {count} documents")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
             cls.client = None
@@ -66,9 +77,9 @@ class PriceHistoryService:
         Returns the inserted document ID or None if failed.
         """
         if not Database.is_connected():
-            logger.warning("MongoDB not connected, skipping price storage")
+            logger.warning(f"MongoDB not connected, skipping price storage for {exchange}")
             return None
-        
+
         try:
             doc = {
                 "exchange": exchange,
@@ -79,10 +90,10 @@ class PriceHistoryService:
                 "source": source
             }
             result = await Database.db.price_history.insert_one(doc)
-            logger.debug(f"Stored price for {exchange}: {last}")
+            logger.debug(f"Stored price for {exchange}: {last} (ID: {result.inserted_id})")
             return str(result.inserted_id)
         except Exception as e:
-            logger.error(f"Failed to store price: {e}")
+            logger.error(f"Failed to store price for {exchange}: {e}", exc_info=True)
             return None
     
     @staticmethod

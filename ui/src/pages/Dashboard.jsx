@@ -3,6 +3,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
 import { formatCurrency, formatPercent } from '../data/mockData';
+import { API_ENDPOINTS } from '../config/api';
 
 // Icon components
 const ArrowUpIcon = () => (
@@ -90,11 +91,11 @@ function Dashboard() {
     const [error, setError] = useState(null);
     const [lastUpdate, setLastUpdate] = useState(null);
 
-    // Fetch current prices
+    // Fetch current prices (every 2 seconds for real-time updates)
     useEffect(() => {
         const fetchCurrentPrices = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/v1/prices/current');
+                const response = await fetch(API_ENDPOINTS.PRICES_CURRENT);
                 if (!response.ok) throw new Error('Failed to fetch data');
                 const data = await response.json();
                 setCurrentData({
@@ -111,22 +112,17 @@ function Dashboard() {
         };
 
         fetchCurrentPrices();
-        const interval = setInterval(fetchCurrentPrices, 30000);
+        const interval = setInterval(fetchCurrentPrices, 2000); // Real-time: every 2 seconds
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch historical data based on selected period
+    // Fetch historical data based on selected period (every 5 seconds for real-time chart)
     useEffect(() => {
         const fetchHistory = async () => {
-            setIsLoading(true);
             try {
-                console.log('[Dashboard] Fetching history for:', selectedPeriod);
-                const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
-                console.log('[Dashboard] Response status:', response.status);
+                const response = await fetch(`${API_ENDPOINTS.PRICES_HISTORY}?interval=${selectedPeriod}`);
                 if (!response.ok) throw new Error('Failed to fetch history');
                 const result = await response.json();
-                console.log('[Dashboard] API result:', result);
-                console.log('[Dashboard] Data array:', result.data_points);
                 setHistoryData(result.data_points || []);
             } catch (err) {
                 console.error("History Fetch Error:", err);
@@ -136,7 +132,10 @@ function Dashboard() {
             }
         };
 
+        setIsLoading(true);
         fetchHistory();
+        const interval = setInterval(fetchHistory, 5000); // Real-time: every 5 seconds
+        return () => clearInterval(interval);
     }, [selectedPeriod]);
 
     const { prices, average, source } = currentData;

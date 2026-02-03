@@ -20,34 +20,59 @@ logger = logging.getLogger(__name__)
 # Get settings
 settings = get_settings()
 
-# Background task for storing prices
-async def store_prices_background(exchange_service: ExchangeService):
-    """Background task to store prices every hour for 24h change calculation."""
+# Background task for fetching prices from APIs (every 5 seconds)
+async def fetch_prices_background(exchange_service: ExchangeService, shared_state: dict):
+    """Background task to fetch prices from external APIs every 5 seconds."""
     while True:
         try:
-            # Get current prices
+            # Force fresh fetch by invalidating cache
+            exchange_service._cache.clear()
+            exchange_service._cache_time.clear()
+
             response = await exchange_service.get_current_prices()
-            
-            # Store each exchange price
-            for price in response.prices:
-                await price_history_service.store_price(
-                    exchange=price.exchange,
-                    bid=price.bid,
-                    ask=price.ask,
-                    last=price.last,
-                    source="scheduled"
-                )
-            
-            logger.info(f"Stored {len(response.prices)} price records")
-            
-            # Cleanup old data periodically (keep 30 days)
-            await price_history_service.cleanup_old_data(30)
-            
+            shared_state["prices"] = response
+            shared_state["last_fetch"] = time.time()
+            logger.info(f"[Fetch Task] Updated {len(response.prices)} prices from APIs")
         except Exception as e:
-            logger.error(f"Error storing prices: {e}")
-        
-        # Wait 1 hour before next storage
-        await asyncio.sleep(3600)
+            logger.error(f"[Fetch Task] Error: {e}")
+
+        # Fetch every 5 seconds
+        await asyncio.sleep(5)
+
+
+# Background task for storing prices to MongoDB (every 1 second)
+async def store_prices_background(shared_state: dict):
+    """Background task to store cached prices to MongoDB every 1 second."""
+    iteration = 0
+    while True:
+        iteration += 1
+        try:
+            response = shared_state.get("prices")
+
+            if response and response.prices:
+                for price in response.prices:
+                    await price_history_service.store_price(
+                        exchange=price.exchange,
+                        bid=price.bid,
+                        ask=price.ask,
+                        last=price.last,
+                        source="realtime"
+                    )
+
+                # Log every 10 iterations (every 10 seconds)
+                if iteration % 10 == 0:
+                    logger.info(f"[Store Task] Iteration {iteration} - Stored {len(response.prices)} prices")
+
+            # Cleanup old data every 3600 iterations (~1 hour)
+            if iteration % 3600 == 0:
+                await price_history_service.cleanup_old_data(7)  # Keep 7 days
+                logger.info("[Store Task] Cleaned up old data")
+
+        except Exception as e:
+            logger.error(f"[Store Task] Error: {e}")
+
+        # Store every 1 second
+        await asyncio.sleep(1)
 
 
 @asynccontextmanager
@@ -56,33 +81,43 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {settings.api_title} v{settings.api_version}")
     logger.info(f"CORS origins: {settings.cors_origins_list}")
-    
+
     # Initialize Exchange Service Singleton
     service = ExchangeService()
     app.state.exchange_service = service
     logger.info("Initialized ExchangeService singleton in app.state")
-    
+
     # Connect to MongoDB
     await Database.connect()
-    
-    # Start background task for price storage (only if MongoDB connected)
-    task = None
+
+    # Shared state for communication between tasks
+    shared_state = {"prices": None, "last_fetch": 0}
+
+    # Start background tasks (only if MongoDB connected)
+    tasks = []
     if Database.is_connected():
-        task = asyncio.create_task(store_prices_background(service))
-        logger.info("Started background price storage task")
+        # Task 1: Fetch from APIs every 5 seconds
+        fetch_task = asyncio.create_task(fetch_prices_background(service, shared_state))
+        tasks.append(fetch_task)
+        logger.info("Started background fetch task (every 5 seconds)")
+
+        # Task 2: Store to MongoDB every 1 second
+        store_task = asyncio.create_task(store_prices_background(shared_state))
+        tasks.append(store_task)
+        logger.info("Started background store task (every 1 second)")
     else:
         logger.warning("MongoDB not connected - price history disabled")
-    
+
     yield
-    
+
     # Shutdown
-    if task:
+    for task in tasks:
         task.cancel()
         try:
             await task
         except asyncio.CancelledError:
             pass
-    
+
     await Database.disconnect()
     logger.info("Shutting down Dollar Tracker API")
 

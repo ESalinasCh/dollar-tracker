@@ -3,6 +3,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import PriceLineChart from '../components/charts/PriceLineChart';
 import { formatCurrency, formatPercent } from '../data/mockData';
+import { API_ENDPOINTS } from '../config/api';
 
 // Time period options (US2: filtros de tiempo)
 const TIME_PERIODS = [
@@ -24,7 +25,7 @@ function Charts() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await fetch('http://localhost:8000/api/v1/prices/current');
+                const response = await fetch(API_ENDPOINTS.PRICES_CURRENT);
                 if (response.ok) {
                     const data = await response.json();
                     setCurrentData({
@@ -49,7 +50,7 @@ function Charts() {
         const fetchHistory = async () => {
             setIsLoading(true);
             try {
-                const response = await fetch(`http://localhost:8000/api/v1/prices/history?interval=${selectedPeriod}`);
+                const response = await fetch(`${API_ENDPOINTS.PRICES_HISTORY}?interval=${selectedPeriod}`);
                 if (response.ok) {
                     const data = await response.json();
                     setHistoryData(data.data_points || []);

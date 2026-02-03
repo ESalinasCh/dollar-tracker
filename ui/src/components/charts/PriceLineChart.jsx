@@ -1,7 +1,6 @@
 import React from 'react';
 import {
-    ComposedChart,
-    Line,
+    AreaChart,
     Area,
     XAxis,
     YAxis,
