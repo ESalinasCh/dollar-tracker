@@ -134,7 +134,7 @@ function Dashboard() {
 
         setIsLoading(true);
         fetchHistory();
-        const interval = setInterval(fetchHistory, 20000); // Refresh history every 60 seconds
+        const interval = setInterval(fetchHistory, 60000); // Refresh history every 60 seconds
         return () => clearInterval(interval);
     }, [selectedPeriod]);
 
